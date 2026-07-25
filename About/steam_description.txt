@@ -1,3 +1,6 @@
+[b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
+[b]Version:[/b] v0.5.1 (Target: RimWorld 1.6)
+
 [h1]RimSynapse - Psychology[/h1]
 [b]Brings your colonists to life by giving them evolving memories, complex interpersonal trust, therapeutic sessions, and trauma responses using LLMs.[/b]
 
@@ -8,9 +11,9 @@ Breathe genuine psychological depth into your colonists. RimSynapse Psychology r
 [h2]Key Features[/h2]
 [list]
 [*] [b]Dynamic Personality Traits:[/b] The 24-hour psychological evaluation tracks profound life events. Pawns can dynamically gain or lose RimWorld traits (such as gaining Bloodlust after a brutal raid, or losing Kind) based on LLM analysis of their rolling short-term memory.
-[*] [b]Trust & Familiarity System:[/b] Replaces vanilla's rigid opinion system with dynamic Trust (-100 to 100) and Familiarity (0 to 100) values. Vanilla OpinionOf is scaled down by 50%, with the custom Trust metric contributing the remaining 50% weight.
-[*] [b]PTSD & Suicidal Breaks:[/b] Pawns suffering severe trauma can experience extreme mental breaks: they may enter a "Trauma Trigger" break (blindly firing at doors, walls, or loud noises before cowering) or attempt a lethal "Suicide/Self-Harm" break using their equipped primary weapon to target critical organs with a 5x damage multiplier.
-[*] [b]Therapy & Consoling:[/b] Right-click target pawns to initiate a Therapy Session. The therapist and patient will sit together and dynamically converse via the background LLM engine. Successful sessions have a dynamic chance (influenced by mood) to permanently [b]cure/remove severe negative and psychological traits[/b] (including PTSD, Depressive, Volatile, Nervous, Psychopath, and Bloodlust - unless locked by their backstory).
+[*] [b]Trust and Familiarity System:[/b] Replaces vanilla's rigid opinion system with dynamic Trust (-100 to 100) and Familiarity (0 to 100) values. Vanilla OpinionOf is scaled down by 50%, with the custom Trust metric contributing the remaining 50% weight.
+[*] [b]PTSD and Suicidal Breaks:[/b] Pawns suffering severe trauma can experience extreme mental breaks: they may enter a "Trauma Trigger" break (blindly firing at doors, walls, or loud noises before cowering) or attempt a lethal "Suicide/Self-Harm" break using their equipped primary weapon to target critical organs with a 5x damage multiplier.
+[*] [b]Therapy and Consoling:[/b] Right-click target pawns to initiate a Therapy Session. The therapist and patient will sit together and dynamically converse via the background LLM engine. Successful sessions have a dynamic chance (influenced by mood) to permanently [b]cure/remove severe negative and psychological traits[/b] (including PTSD, Depressive, Volatile, Nervous, Psychopath, and Bloodlust - unless locked by their backstory).
 [*] [b]Opportunistic Euphoria:[/b] Pawns who maintain an extremely high mood (>90%) for a sustained 24 in-game hours will automatically generate a positive core memory.
 [*] [b]Ritual Remarks:[/b] Colonists pull from their LLM relationship memories to deliver personalized Vows during marriages and Eulogies during funerals.
 [*] [b]Forced Psychological Reviews:[/b] Demand an immediate clinical evaluation of the pawn's mental state from the LLM via the new Social Network tab.
@@ -49,6 +52,6 @@ Breathe genuine psychological depth into your colonists. RimSynapse Psychology r
 
 ---
 
-[h2]Open Source & Support[/h2]
+[h2]Open Source and Support[/h2]
 GitHub: [url]https://github.com/RimSynapse/Psychology[/url]
 Buy me a coffee: [url]https://buymeacoffee.com/archdukejim[/url]
