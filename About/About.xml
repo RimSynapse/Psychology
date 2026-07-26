@@ -26,7 +26,7 @@
     </loadAfter>
     <description>
 Discord Community: https://discord.gg/eVBebZ2N9s
-Version: v0.5.1 (Target: RimWorld 1.6)
+Version: v0.5.2 (Target: RimWorld 1.6)
 
 RimSynapse - Psychology
 Official Wiki and Documentation: https://github.com/RimSynapse/Psychology/wiki
@@ -51,6 +51,9 @@ Brings your colonists to life by giving them evolving memories, complex interper
 - Psychological Addictions: Pawns may turn to specific drugs as a coping mechanism for specific negative memories.
 
 --- Changelog ---
+v0.5.2
+- Fixed: ceremony and funeral records crashed when the model replied without a narrative
+- Licence changed to PolyForm Noncommercial 1.0.0
 v0.4.0
 - Updated to support RimSynapse Core v0.4.0 (Multi-provider routing and Image generation).
 
