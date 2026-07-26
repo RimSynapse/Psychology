@@ -1,6 +1,0 @@
-d:\github\rimsynapse\Psychology\Source\obj\Release\RimSynapsePsychology.csproj.AssemblyReference.cache
-d:\github\rimsynapse\Psychology\Source\obj\Release\RimSynapsePsychology.GeneratedMSBuildEditorConfig.editorconfig
-d:\github\rimsynapse\Psychology\Source\obj\Release\RimSynapsePsychology.csproj.CoreCompileInputs.cache
-d:\github\rimsynapse\Psychology\Assemblies\RimSynapsePsychology.dll
-d:\github\rimsynapse\Psychology\Source\obj\Release\RimSynap.5CF17285.Up2Date
-d:\github\rimsynapse\Psychology\Source\obj\Release\RimSynapsePsychology.dll
