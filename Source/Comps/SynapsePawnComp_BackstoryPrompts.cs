@@ -38,13 +38,13 @@ namespace RimSynapse.Psychology.Comps
             // Allow Core/Factions to inject extra context (like Ideology)
             string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, "BackstoryChildhood");
 
-            string systemPrompt = @"You are writing a vivid first-person memory for a colonist in the RimWorld universe.
+            string systemPrompt = @"You are writing a vivid third-person memory for a colonist in the RimWorld universe, as if the AI Storyteller is describing their childhood.
 This memory is from their CHILDHOOD. It should be a specific, concrete scene — not a summary.
 
 RULES:
-- Write 100-200 words, first person (""I"", ""me"", ""my"")
+- Write 100-200 words, third person (using their name or ""he/she"", never ""I"" or ""my"")
 - This is a SINGLE vivid memory, not a life summary
-- Ground the memory in the skill bonuses: if they got +4 Mining, describe WHY through experience (""I spent years chipping limestone..."")
+- Ground the memory in the skill bonuses: if they got +4 Mining, describe WHY through experience (e.g., ""Josema spent years chipping limestone..."")
 - If work types are disabled, hint at WHY (trauma, cultural taboo, physical limitation)
 - The memory should feel personal and emotionally resonant — a moment they'd actually remember
 - RimWorld setting: frontier planets, crashlanded survivors, tribal societies, harsh conditions
@@ -57,7 +57,7 @@ RULES:
 
 You MUST respond in valid JSON:
 {
-  ""Memory"": ""I remember the first time I...(100-200 words)..."",
+  ""Memory"": ""Josema remembered the first time he...(100-200 words)..."",
   ""Hometown"": ""Kharstead"",
   ""Tags"": [""Origin"", ""Childhood"", ""Mining""],
   ""EmotionalTone"": ""bittersweet""
@@ -160,11 +160,11 @@ Write a vivid childhood memory grounded in these skills.";
             // Allow Core/Factions to inject extra context
             string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, "BackstoryAdulthood");
 
-            string systemPrompt = @"You are writing a vivid first-person memory for a colonist in the RimWorld universe.
+            string systemPrompt = @"You are writing a vivid third-person memory for a colonist in the RimWorld universe, as if the AI Storyteller is describing their adulthood.
 This memory is from their ADULTHOOD. It should be a specific, concrete scene — not a summary.
 
 RULES:
-- Write 100-200 words, first person (""I"", ""me"", ""my"")
+- Write 100-200 words, third person (using their name or ""he/she"", never ""I"" or ""my"")
 - This is a SINGLE vivid memory, not a life summary
 - Ground the memory in the skill bonuses: if they got +6 Shooting, describe the experience that gave them that skill
 - If work types are disabled, hint at WHY (trauma, injury, philosophical opposition)
@@ -174,7 +174,7 @@ RULES:
 
 You MUST respond in valid JSON:
 {
-  ""Memory"": ""The day I first...(100-200 words)..."",
+  ""Memory"": ""The day Josema first...(100-200 words)..."",
   ""Tags"": [""Adulthood"", ""Combat"", ""Survival""],
   ""EmotionalTone"": ""determined""
 }";
@@ -274,7 +274,7 @@ OUTPUT FORMAT:
    - Jungian Type (MBTI: e.g., ENFP, INTJ, INFJ, ESTP)
    - Core Archetype (e.g., Caregiver, Outlaw, Creator, Sage, Ruler, Hero, Explorer, Jester)
    - Temperament (e.g., Sanguine, Melancholic, Phlegmatic, Choleric)
-3. [FIRST_IMPRESSION] — A single first-person sentence: what this pawn thinks on arrival at the colony. Written as ""I"".
+3. [FIRST_IMPRESSION] — A detailed 2-3 sentence narrative memory of the pawn's arrival at the colony. Written in the third person perspective (using their name or ""he/she"", never ""I"" or ""my""). This should connect their background, childhood dreams, and aspirations to their landing context (e.g. waking from cryosleep).
 
 You MUST respond in valid JSON:
 {
@@ -282,7 +282,7 @@ You MUST respond in valid JSON:
   ""JungianType"": ""INTJ"",
   ""CoreArchetype"": ""Explorer"",
   ""Temperament"": ""Melancholic"",
-  ""FirstImpression"": ""I've been walking for weeks, and this place will have to do.""
+  ""FirstImpression"": ""Fred stepped out of cryosleep after decades in the void. Though this harsh desert outpost was far from the lush forest worlds of his childhood dreams, he was resolved to make it his home and build something lasting.""
 }";
 
             string userMessage = $@"Colonist: {pawn.Name.ToStringShort}
@@ -331,17 +331,16 @@ Synthesize their psychological profile.";
 
                             if (parsed.TryGetValue("FirstImpression", out object impression))
                             {
-                                long nowTick = SynapseDateHelper.GetCurrentAbsTick();
                                 coreComp.memories.Add(new WeightedMemory
                                 {
                                     summary = impression.ToString(),
-                                    weight = 1.0f,
-                                    baseWeight = 1.0f,
-                                    decayRate = 0.02f,
+                                    weight = 4.0f,
+                                    baseWeight = 4.0f,
+                                    decayRate = 0.005f,
                                     tags = new List<string> { "Arrival", "FirstImpression" },
                                     memoryType = "Arrival",
-                                    absTick = nowTick,
-                                    gameTick = Find.TickManager.TicksGame
+                                    absTick = SynapseDateHelper.GetAdjustmentTick(),
+                                    gameTick = 0
                                 });
                             }
 

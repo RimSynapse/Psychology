@@ -24,11 +24,11 @@ namespace RimSynapse.Psychology.API
             string childhoodDesc = childhood?.description ?? "An unremarkable childhood.";
             string skillBonuses = FormatSkillGains(childhood);
 
-            string systemPrompt = @"You are writing a vivid first-person memory for a visitor in the RimWorld universe.
+            string systemPrompt = @"You are writing a vivid third-person memory for a visitor in the RimWorld universe, as if the AI Storyteller is describing their childhood.
 This memory is from their CHILDHOOD. Keep it brief and grounded.
 
 RULES:
-- Write 80-120 words, first person (""I"", ""me"", ""my"")
+- Write 80-120 words, third person (using their name or ""he/she"", never ""I"" or ""my"")
 - Ground the memory in their skill bonuses — their abilities come from real experience
 - Generate a ""Hometown"" — their place of origin, matching their faction type:
   - Outlander → a named settlement (e.g., ""Port Valen"")
@@ -39,7 +39,7 @@ RULES:
 
 You MUST respond in valid JSON:
 {
-  ""Memory"": ""I remember...(80-120 words)..."",
+  ""Memory"": ""Josema remembered the first time he...(80-120 words)..."",
   ""Hometown"": ""Port Valen"",
   ""Tags"": [""Origin"", ""Childhood""]
 }";
@@ -131,18 +131,18 @@ Skills: {skillBonuses}";
                 ? $"\nHometown: {coreComp.hometown}"
                 : "";
 
-            string systemPrompt = @"You are writing a vivid first-person memory for a visitor in the RimWorld universe.
+            string systemPrompt = @"You are writing a vivid third-person memory for a visitor in the RimWorld universe, as if the AI Storyteller is describing their adulthood.
 This memory is from their ADULTHOOD. Keep it brief and grounded.
 
 RULES:
-- Write 80-120 words, first person (""I"", ""me"", ""my"")
+- Write 80-120 words, third person (using their name or ""he/she"", never ""I"" or ""my"")
 - Ground the memory in their skill bonuses
 - If a childhood memory is provided, maintain narrative continuity
 - This should be a defining adult moment — what made them who they are
 
 You MUST respond in valid JSON:
 {
-  ""Memory"": ""The day I...(80-120 words)..."",
+  ""Memory"": ""The day Josema first...(80-120 words)..."",
   ""Tags"": [""Adulthood"", ""Defining""]
 }";
 

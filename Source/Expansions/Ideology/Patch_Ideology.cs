@@ -55,6 +55,7 @@ namespace RimSynapse.Psychology.Patches
         public static void Postfix(Pawn_IdeoTracker __instance, Ideo ideo)
         {
             if (!ModsConfig.IdeologyActive) return;
+            if (Current.ProgramState != ProgramState.Playing || Find.TickManager.TicksGame <= 5) return;
             Pawn pawn = HarmonyLib.Traverse.Create(__instance).Field("pawn").GetValue<Pawn>();
             if (pawn == null || !pawn.IsColonist) return;
 

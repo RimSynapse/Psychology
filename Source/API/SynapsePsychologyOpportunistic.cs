@@ -32,23 +32,27 @@ namespace RimSynapse.Psychology.API
             var pawns = Find.CurrentMap.mapPawns.FreeColonists.OrderBy(_ => Rand.Value).Take(3).ToList();
             if (pawns.Count == 0) return false;
 
-            string systemPrompt = @"You are the internal monologues of the specified RimWorld colonists.
-A significant event just occurred. Write a very short (1-2 sentences) personal memory/journal entry for EACH colonist about this event.
-You must also provide a list of 1-3 single-word tags (keywords) for each memory (e.g. 'Food', 'Combat', 'Resentment', 'Safety').
-And assign a memory weight (0.1 to 5.0) and decay rate (0.01 to 0.5) based on how traumatic/important it was.
+            string systemPrompt = @"You are the AI storyteller evaluating the psychology and memories of the specified RimWorld colonists.
+A significant event just occurred. For EACH colonist, write a third-person evaluative memory (using their name or 'he/she', never 'I' or 'my') describing how they likely felt at the time the event occurred.
 
-CRITICAL INSTRUCTION FOR DEFINING MEMORIES: 
-Desensitization matters. Look at their lifetime statistics. If they have 25 kills, another kill isn't traumatic. If it's their first, it is life-altering.
-If this event is life-altering (e.g., first kill, death of a close friend, marriage, creating a legendary artifact), you MUST set the `Decay` value strictly to `0.0` so it never fades. Defining memories do not decay.
+INSTRUCTIONS:
+1. EVALUATIVE NARRATION: Do not just write melodrama. Blends their personal traits, current needs (e.g., hunger, mood), and environment to evaluate their state:
+   - If they are starving or in danger, their worry about survival might dull their grief over a friend's death.
+   - If life is exceptionally comfortable (high mood/wealth), they might find recovery from tragedy easier.
+   - If they have traits like Psychopath, they might focus on cold rain or practical matters rather than emotional loss.
+2. EVENT SCALE & LENGTH:
+   - MAJOR EVENTS (e.g., death of a spouse/close relative, first kill, a colonist joining, legendary craft, major raid): Generate a detailed 2-3 sentence narrative memory. Set Weight between 3.0 and 5.0, and Decay between 0.0 and 0.005 (or 0.0 for permanent defining memories).
+   - STANDARD/MINOR EVENTS: Generate a brief, single-sentence memory (10-15 words). Set Weight between 0.1 and 1.5, and Decay between 0.05 and 0.3.
+3. DESENSITIZATION: Consider their lifetime statistics. A veteran killer is not traumatized by another death, but their first kill is life-altering.
 
 You MUST respond strictly in valid JSON format:
 {
   ""Memories"": [
     {
       ""PawnId"": ""ThingID_Here"",
-      ""Summary"": ""I was starving, and we just gave our food to beggars..."",
-      ""Tags"": [""Food"", ""Resentment""],
-      ""Weight"": 1.5,
+      ""Summary"": ""Though the loss of his friend weighed on Fred, his immediate starvation and the falling cold rain occupied his mind, leaving him feeling strangely detached from the tragedy."",
+      ""Tags"": [""Death"", ""Grief"", ""Starvation""],
+      ""Weight"": 1.2,
       ""Decay"": 0.05
     }
   ]
@@ -254,6 +258,8 @@ You MUST respond strictly in valid JSON format:
         {
             if (p.Faction != null && p.Faction.leader == p) return true;
             if (p.IsPrisonerOfColony) return true;
+            var coreComp = p.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
+            if (coreComp != null && coreComp.isResident) return true;
             if (RimSynapse.Expansions.Royalty.PsychologyRoyaltyIntegration.IsNoble(p)) return true;
             if (p.relations != null && p.relations.FamilyByBlood.Any(r => r.Faction == Faction.OfPlayer || r.IsPrisonerOfColony)) return true;
             return false;

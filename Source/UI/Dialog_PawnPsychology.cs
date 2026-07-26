@@ -28,8 +28,10 @@ namespace RimSynapse.Psychology.UI
         private PsychologyTab currentTab = PsychologyTab.Profile;
         
         private Vector2 memoriesScrollPosition = Vector2.zero;
+        public static bool showShortTermMemories = false;
         private Vector2 profileScrollPosition = Vector2.zero;
         private Vector2 socialScrollPosition = Vector2.zero;
+        private Vector2 funeralScrollPosition = Vector2.zero;
         private Dictionary<string, Pawn> cachedTrustPawns = null;
         
         public override Vector2 InitialSize => new Vector2(650f, 750f);
@@ -42,8 +44,9 @@ namespace RimSynapse.Psychology.UI
             this.doCloseX = true;
             this.draggable = true;
             this.resizeable = true;
-            this.closeOnClickedOutside = true;
+            this.closeOnClickedOutside = false;
             this.absorbInputAroundWindow = false;
+            this.preventCameraMotion = false;
         }
 
         public override void DoWindowContents(Rect inRect)
@@ -74,19 +77,25 @@ namespace RimSynapse.Psychology.UI
                 fullName = pawn.Name.ToStringFull;
             }
 
-            Widgets.Label(headerRect, fullName);
+            string title = pawn.Dead ? "In Memoriam: " + fullName : fullName;
+            Widgets.Label(headerRect, title);
             Text.Anchor = TextAnchor.UpperLeft;
             Text.Font = GameFont.Small;
 
             // Setup Tab space
             Rect tabRect = new Rect(0f, headerRect.yMax + 30f, inRect.width, inRect.height - headerRect.yMax - 30f);
             
-            List<TabRecord> tabs = new List<TabRecord>
+            List<TabRecord> tabs = new List<TabRecord>();
+            if (pawn.Dead)
             {
-                new TabRecord("Psychological Profile", () => currentTab = PsychologyTab.Profile, currentTab == PsychologyTab.Profile),
-                new TabRecord("Memories", () => currentTab = PsychologyTab.Memories, currentTab == PsychologyTab.Memories),
-                new TabRecord("Social Network", () => currentTab = PsychologyTab.SocialNetwork, currentTab == PsychologyTab.SocialNetwork)
-            };
+                tabs.Add(new TabRecord("Funeral Record", () => currentTab = PsychologyTab.Profile, currentTab == PsychologyTab.Profile));
+            }
+            else
+            {
+                tabs.Add(new TabRecord("Psychological Profile", () => currentTab = PsychologyTab.Profile, currentTab == PsychologyTab.Profile));
+            }
+            tabs.Add(new TabRecord("Memories", () => currentTab = PsychologyTab.Memories, currentTab == PsychologyTab.Memories));
+            tabs.Add(new TabRecord("Social Network", () => currentTab = PsychologyTab.SocialNetwork, currentTab == PsychologyTab.SocialNetwork));
             
             TabDrawer.DrawTabs(tabRect, tabs, 200f);
 
@@ -96,7 +105,10 @@ namespace RimSynapse.Psychology.UI
             switch (currentTab)
             {
                 case PsychologyTab.Profile:
-                    DrawProfileTab(contentRect);
+                    if (pawn.Dead)
+                        DrawFuneralTab(contentRect);
+                    else
+                        DrawProfileTab(contentRect);
                     break;
                 case PsychologyTab.Memories:
                     DrawMemoriesTab(contentRect);

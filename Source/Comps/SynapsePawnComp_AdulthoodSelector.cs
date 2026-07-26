@@ -72,13 +72,13 @@ RULES:
 - Consider their skill development — a pawn who spent years healing should become a medic, not a soldier
 - Each candidate shows its skill bonuses and any work it DISABLES
 - Be aware: choosing a backstory that disables work they currently do WILL affect gameplay
-- After selecting, write a brief 100-word first-person memory of the moment they embraced this identity
+- After selecting, write a brief 100-word third-person memory of the moment they embraced this identity (using their name or ""he/she"", never ""I"" or ""my"")
 
 You MUST respond in valid JSON:
 {
   ""ChosenNumber"": 3,
   ""Reasoning"": ""Their memories of tending to injured colonists and studying under Dr. Kara..."",
-  ""Memory"": ""I remember the day I realized this was who I was meant to be...(100 words)..."",
+  ""Memory"": ""Fred realized this was who he was meant to be...(100 words)..."",
   ""Tags"": [""Adulthood"", ""Identity"", ""Transition""]
 }";
 

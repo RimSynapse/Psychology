@@ -189,8 +189,31 @@ namespace RimSynapse.Psychology.UI
                 return;
             }
 
+            // Draw Checkbox at the top of the tab
+            Rect checkboxRect = new Rect(rect.x, rect.y, rect.width, 24f);
+            Widgets.CheckboxLabeled(checkboxRect, "Show Short Term Memories", ref showShortTermMemories);
+
             // Sort chronologically (oldest first) using absTick
             var sortedMemories = coreComp.memories.OrderBy(m => m.absTick).ToList();
+
+            // Filter out social/conversation memories unless DevMode is on OR showShortTermMemories is enabled
+            if (!Prefs.DevMode && !showShortTermMemories)
+            {
+                sortedMemories = sortedMemories.Where(m => 
+                    m.memoryType != "social" && 
+                    m.memoryType != "social_chat" && 
+                    m.memoryType != "non_response" &&
+                    m.memoryType != "conversation" &&
+                    m.memoryType != "overheard" &&
+                    !(m.memoryType == "EventReflection" && m.tags != null && (m.tags.Contains("Chitchat") || m.tags.Contains("chitchat") || m.tags.Contains("DeepTalk") || m.tags.Contains("deeptalk")))
+                ).ToList();
+            }
+
+            if (sortedMemories.Count == 0)
+            {
+                Widgets.Label(new Rect(rect.x, rect.y + 28f, rect.width, rect.height - 28f), "No memories recorded yet.");
+                return;
+            }
 
             float viewHeight = 0f;
             foreach (var memory in sortedMemories)
@@ -199,22 +222,114 @@ namespace RimSynapse.Psychology.UI
             }
 
             Rect viewRect = new Rect(0f, 0f, rect.width - 20f, viewHeight);
+            Rect scrollRect = new Rect(rect.x, rect.y + 28f, rect.width, rect.height - 28f);
             
-            Widgets.BeginScrollView(rect, ref memoriesScrollPosition, viewRect);
+            Widgets.BeginScrollView(scrollRect, ref memoriesScrollPosition, viewRect);
             
             float currentEntryY = 0f;
             foreach (var memory in sortedMemories)
             {
                 // Draw date label using the chronological absTick
                 string dateStr = SynapseDateHelper.FormatAbsTick(memory.absTick);
-                string typeLabel = memory.memoryType ?? "Event";
+                
+                string sourceLabel = "Event";
+                if (!string.IsNullOrEmpty(memory.memoryType))
+                {
+                    if (memory.memoryType == "BackstoryChildhood")
+                    {
+                        string title = pawn.story?.Childhood?.title;
+                        sourceLabel = !string.IsNullOrEmpty(title) 
+                            ? $"Childhood: {title.CapitalizeFirst()}" 
+                            : "Childhood Backstory";
+                    }
+                    else if (memory.memoryType == "BackstoryAdulthood")
+                    {
+                        string title = pawn.story?.Adulthood?.title;
+                        sourceLabel = !string.IsNullOrEmpty(title) 
+                            ? $"Adulthood: {title.CapitalizeFirst()}" 
+                            : "Adulthood Backstory";
+                    }
+                    else if (memory.memoryType == "Arrival" || memory.memoryType == "ArrivalFirstImpression") sourceLabel = Find.Scenario?.name ?? "Scenario Start";
+                    else if (memory.memoryType == "social" || memory.memoryType == "social_chat") sourceLabel = "Conversation";
+                    else if (memory.memoryType == "non_response") sourceLabel = "Ignored Dialogue";
+                    else if (memory.memoryType == "funeral" || memory.memoryType == "Funeral") sourceLabel = "Funeral Ceremony";
+                    else if (memory.memoryType == "EventReflection")
+                    {
+                        sourceLabel = "Past Event";
+                        if (memory.tags != null && memory.tags.Count > 0)
+                        {
+                            if (memory.tags.Contains("Chitchat") || memory.tags.Contains("chitchat") || memory.tags.Contains("Chit-Chat"))
+                            {
+                                sourceLabel = "Chit-Chat";
+                            }
+                            else if (memory.tags.Contains("DeepTalk") || memory.tags.Contains("deeptalk") || memory.tags.Contains("Deep Conversation"))
+                            {
+                                sourceLabel = "Deep Conversation";
+                            }
+                            else if (memory.tags.Contains("Insult") || memory.tags.Contains("insult"))
+                            {
+                                sourceLabel = "Insult";
+                            }
+                            else if (memory.tags.Contains("Death") || memory.tags.Contains("death"))
+                            {
+                                string deadPawnName = null;
+                                if (Current.ProgramState == ProgramState.Playing)
+                                {
+                                    var allPawns = (Find.CurrentMap?.mapPawns?.AllPawns ?? Enumerable.Empty<Pawn>())
+                                        .Concat(Find.WorldPawns.AllPawnsAliveOrDead);
+                                    foreach (var p in allPawns)
+                                    {
+                                        if (p.Name != null && !string.IsNullOrEmpty(p.Name.ToStringShort) && 
+                                            memory.summary.Contains(p.Name.ToStringShort))
+                                        {
+                                            deadPawnName = p.Name.ToStringShort;
+                                            break;
+                                        }
+                                    }
+                                }
+                                sourceLabel = !string.IsNullOrEmpty(deadPawnName) ? $"Death of {deadPawnName}" : "Colonist Death";
+                            }
+                            else
+                            {
+                                // Try to resolve human-readable name from vanilla/modded IncidentDefs
+                                foreach (var tag in memory.tags)
+                                {
+                                    var incDef = DefDatabase<IncidentDef>.GetNamed(tag, false);
+                                    if (incDef != null)
+                                    {
+                                        sourceLabel = incDef.LabelCap;
+                                        break;
+                                    }
+                                }
+
+                                // Fallback to our custom categories if no IncidentDef is matched
+                                if (sourceLabel == "Past Event")
+                                {
+                                    if (memory.tags.Contains("Raid")) sourceLabel = "Raid Incident";
+                                    else if (memory.tags.Contains("Sickness")) sourceLabel = "Illness";
+                                }
+                            }
+                        }
+
+                        // General fallback for conversation descriptions
+                        if (sourceLabel == "Past Event" && (memory.summary.Contains("talking about") || memory.summary.Contains("talked about") || memory.summary.Contains("discussing") || memory.summary.Contains("discussed")))
+                        {
+                            sourceLabel = "Conversation";
+                        }
+                    }
+                    else
+                    {
+                        sourceLabel = System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(memory.memoryType);
+                    }
+                }
+
                 float alpha = Mathf.Clamp(memory.weight, 0.3f, 1f);
                 
                 // Date and type header
                 Text.Font = GameFont.Tiny;
                 GUI.color = new Color(0.6f, 0.6f, 0.6f);
                 Rect dateRect = new Rect(0f, currentEntryY, viewRect.width, 18f);
-                Widgets.Label(dateRect, $"[{dateStr}] ({typeLabel})  Weight: {memory.weight:F2}");
+                Widgets.Label(dateRect, $"[{dateStr}]  •  {sourceLabel}    Weight: {memory.weight:F2}");
                 GUI.color = Color.white;
                 Text.Font = GameFont.Small;
                 currentEntryY += 18f;
@@ -246,7 +361,9 @@ namespace RimSynapse.Psychology.UI
             if (cachedTrustPawns == null)
             {
                 cachedTrustPawns = new Dictionary<string, Pawn>();
-                var allPawns = (pawn.Map?.mapPawns?.AllPawnsSpawned ?? Enumerable.Empty<Pawn>())
+                var allPawns = (Find.Maps != null 
+                    ? Find.Maps.SelectMany(m => m.mapPawns?.AllPawns ?? Enumerable.Empty<Pawn>()) 
+                    : Enumerable.Empty<Pawn>())
                     .Concat(Find.WorldPawns.AllPawnsAliveOrDead);
                 foreach (var kvp in pawnComp.socialNetwork)
                 {
@@ -345,6 +462,28 @@ namespace RimSynapse.Psychology.UI
                 curY += 60f + extraHeight;
             }
             
+            Widgets.EndScrollView();
+        }
+
+        private void DrawFuneralTab(Rect rect)
+        {
+            var worldComp = Find.World?.GetComponent<SynapsePsychologyWorldComponent>();
+            string recordText = "No funeral record found for this colonist.";
+            if (worldComp != null)
+            {
+                string pawnId = pawn.GetUniqueLoadID();
+                if (worldComp.funeralRecords.TryGetValue(pawnId, out string record))
+                {
+                    recordText = record;
+                }
+            }
+
+            Rect outRect = new Rect(rect.x, rect.y, rect.width, rect.height - 10f);
+            float textHeight = Text.CalcHeight(recordText, outRect.width - 20f);
+            Rect viewRect = new Rect(0, 0, outRect.width - 20f, textHeight + 20f);
+
+            Widgets.BeginScrollView(outRect, ref funeralScrollPosition, viewRect);
+            Widgets.Label(new Rect(0, 0, viewRect.width, viewRect.height), recordText);
             Widgets.EndScrollView();
         }
     }

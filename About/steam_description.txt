@@ -1,32 +1,54 @@
+[b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
+[b]Version:[/b] v0.5.2 (Target: RimWorld 1.6)
+
 [h1]RimSynapse - Psychology[/h1]
-[b]📚 [url=https://github.com/RimSynapse/Psychology/wiki]Official Wiki and Documentation[/url][/b]
+[b]Brings your colonists to life by giving them evolving memories, complex interpersonal trust, therapeutic sessions, and trauma responses using LLMs.[/b]
 
-[b]Companion Mod for RimSynapse. Requires RimSynapse - Core.[/b]
-Brings your colonists to life by giving them evolving memories, complex interpersonal trust, therapeutic sessions, and trauma responses. 
+Breathe genuine psychological depth into your colonists. RimSynapse Psychology replaces rigid vanilla opinions with a fluid Trust/Familiarity system and lets pawns accumulate core memories that dynamically reshape their traits and mental breaks based on LLM analysis.
 
-[h2]Current Features[/h2]
+---
+
+[h2]Key Features[/h2]
 [list]
-[*] [b]Dynamic Personality Traits:[/b] The 24-hour psychological evaluation tracks profound life events. Pawns can dynamically gain or lose RimWorld traits (such as gaining [i]Bloodlust[/i] after a brutal raid, or losing [i]Kind[/i]) based on LLM analysis of their rolling short-term memory.
-[*] [b]Trust and Familiarity System:[/b] Replaces vanilla's rigid opinion system with dynamic Trust (-100 to 100) and Familiarity (0 to 100) values. Vanilla [i]OpinionOf[/i] is scaled down by 50%, with the custom Trust metric contributing the remaining 50% weight.
-[*] [b]PTSD and Trauma Breaks:[/b] A new mental state, [i]Trauma Trigger[/i], causes pawns with severe negative memories to blindly fire their weapon at surrounding doors, walls, or loud noises before cowering in fear. Hitting a living creature snaps them out of it.
-[*] [b]Player-Driven Therapy:[/b] Right-click pawns to initiate a Therapy Session. Act as a "Guiding Hand" and manually type out the initiating pawn's dialogue, or let the LLM resolve the conversation in the background based on their Intelligence, Social skill, and Ideology.
+[*] [b]Dynamic Personality Traits:[/b] The 24-hour psychological evaluation tracks profound life events. Pawns can dynamically gain or lose RimWorld traits (such as gaining Bloodlust after a brutal raid, or losing Kind) based on LLM analysis of their rolling short-term memory.
+[*] [b]Trust and Familiarity System:[/b] Replaces vanilla's rigid opinion system with dynamic Trust (-100 to 100) and Familiarity (0 to 100) values. Vanilla OpinionOf is scaled down by 50%, with the custom Trust metric contributing the remaining 50% weight.
+[*] [b]PTSD and Suicidal Breaks:[/b] Pawns suffering severe trauma can experience extreme mental breaks: they may enter a "Trauma Trigger" break (blindly firing at doors, walls, or loud noises before cowering) or attempt a lethal "Suicide/Self-Harm" break using their equipped primary weapon to target critical organs with a 5x damage multiplier.
+[*] [b]Therapy and Consoling:[/b] Right-click target pawns to initiate a Therapy Session. The therapist and patient will sit together and dynamically converse via the background LLM engine. Successful sessions have a dynamic chance (influenced by mood) to permanently [b]cure/remove severe negative and psychological traits[/b] (including PTSD, Depressive, Volatile, Nervous, Psychopath, and Bloodlust - unless locked by their backstory).
 [*] [b]Opportunistic Euphoria:[/b] Pawns who maintain an extremely high mood (>90%) for a sustained 24 in-game hours will automatically generate a positive core memory.
 [*] [b]Ritual Remarks:[/b] Colonists pull from their LLM relationship memories to deliver personalized Vows during marriages and Eulogies during funerals.
 [*] [b]Forced Psychological Reviews:[/b] Demand an immediate clinical evaluation of the pawn's mental state from the LLM via the new Social Network tab.
-[*] [b]World VIP Backstories:[/b] Faction Leaders are no longer generic. They generate with a rich, ideologically consistent history and personality profile.
+[*] [b]World VIP Backstories:[/b] Faction Leaders generate with a rich, ideologically consistent history and personality profile.
 [/list]
 
-[h2]Planned Upcoming Features[/h2]
+---
+
+[h2]Roadmap[/h2]
 [list]
-[*] [b]Couples Counseling and Dynamic Romance:[/b] Breakups and romances driven entirely by shared memories and psychological compatibility rather than RNG.
-[*] [b]LLM-Generated Phobias:[/b] Pawns who suffer specific traumas (e.g., severe burns, insectoid attacks) may develop targeted phobias that alter their pathing and combat behavior.
-[*] [b]Group Therapy:[/b] Let your highest-social pawn lead group sessions to mass-resolve colony-wide trauma after devastating events.
-[*] [b]Psychological Addictions:[/b] Pawns may turn to specific drugs as a coping mechanism for specific negative memories.
+[*] [b]0.6 - Agent and Tool Foundation:[/b] An in-game agent that plans and carries out multi-step actions on its own, backed by a growing library of tools it can query for colony, faction and world state.
+[*] [b]0.7 - Logic Externalization:[/b] Retiring hardcoded thresholds so the storyteller reasons about your colony's situation instead of following fixed rules.
+[*] [b]0.8 - Emergent Systems and Content:[/b] Faction archetypes for each DLC, caravans that travel the world map, settlement crises, faction capitals and travelling leaders, and richer colonist social dynamics.
+[/list]
+These ship when they are ready - no dates.
+
+---
+
+[h2]Changelog (v0.5.2)[/h2]
+[list]
+[*] [b]FIXED - Ceremony records crashed:[/b] Funerals and other ceremonies threw an error when the model answered without a written narrative. Incomplete responses are now skipped cleanly instead.
+[*] [b]FIXED - Clearer error reporting:[/b] Background AI callbacks now name the feature that failed rather than logging a bare error.
+[*] [b]Licence:[/b] Now PolyForm Noncommercial 1.0.0. Free to use, modify and share for any noncommercial purpose.
 [/list]
 
-[h2]Changelog[/h2]
-[b]v0.4.0[/b]
-- Updated to support RimSynapse Core v0.4.0 (Multi-provider routing and Image generation).
+---
+
+[h2]Changelog (v0.5.1)[/h2]
+[list]
+[*] [b]NEW: Memory Tab Visibility filters:[/b] Hides cluttering short-term social and conversation memories by default, adding a "Show Short Term Memories" checkbox toggle to show them.
+[*] [b]NEW: Dynamic Warden recruitment patches:[/b] Re-engineered the prisoner recruitment success patch to link dynamically to `RecruitChance` via reflection, preventing compatibility crashes.
+[*] [b]Performance Tuning:[/b] Substantially optimized background memory processing logic.
+[/list]
+
+---
 
 [h2]Compatibility Matrix[/h2]
 [list]
@@ -35,11 +57,21 @@ Brings your colonists to life by giving them evolving memories, complex interper
 [*] [b]Biotech DLC:[/b] Compatible and Optional. Integrates genetic dysphoria and vat-grown trauma.
 [*] [b]Anomaly DLC:[/b] Compatible and Optional. Integrates void taint and cosmic horror PTSD.
 [*] [b]RimSynapse - Factions:[/b] Compatible and Optional. Empowers world generation to build deep psychological profiles and traits for Faction Leaders.
-[*] [b]RimSynapse - Chat:[/b] Compatible and Optional. Colonists' generated dialogue will be directly influenced by their current Trust levels, Familiarity, and accumulated traumas.
+[*] [b]RimSynapse - Conversations:[/b] Compatible and Optional. Colonists' generated dialogue will be directly influenced by their current Trust levels, Familiarity, and accumulated traumas.
 [*] [b]RimSynapse - WorldNews:[/b] Compatible and Optional. Prints gossip and news articles about your pawns' most dramatic psychological events and relationships.
 [/list]
 
+---
+
 [h2]Requirements[/h2]
 [list]
-[*] [b]RimSynapse - Core[/b] (Must be loaded before this mod)
+[*] RimSynapse - Core (Must be loaded before this mod)
+[*] Harmony
 [/list]
+
+---
+
+[h2]Source Code and Support[/h2]
+GitHub: [url]https://github.com/RimSynapse/Psychology[/url]
+Licence: [url=https://polyformproject.org/licenses/noncommercial/1.0.0/]PolyForm Noncommercial License 1.0.0[/url] - free for any noncommercial use.
+Buy me a coffee: [url]https://buymeacoffee.com/archdukejim[/url]

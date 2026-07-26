@@ -20,15 +20,29 @@ namespace RimSynapse.Psychology
             var harmony = new Harmony("RimSynapse.Psychology");
             harmony.PatchAll();
             
-            // Manual Patch for Funeral (Ideology only)
-            var funeralType = AccessTools.TypeByName("RimWorld.RitualOutcomeEffectWorker_Funeral");
-            if (funeralType != null)
+            // Manual Patches for Ritual/Ceremony Outcomes (Ideology and Royalty)
+            string[] outcomeWorkerTypes = new string[]
             {
-                var original = AccessTools.Method(funeralType, "Apply");
-                var postfix = AccessTools.Method(typeof(Patches.Patch_Funeral_Apply), "Postfix");
-                if (original != null && postfix != null)
+                "RimWorld.RitualOutcomeEffectWorker_FromQuality",
+                "RimWorld.RitualOutcomeEffectWorker_FromQualityWithReason",
+                "RimWorld.RitualOutcomeEffectWorker_Speech",
+                "RimWorld.RitualOutcomeEffectWorker_RoleChange",
+                "RimWorld.RitualOutcomeEffectWorker_Conversion",
+                "RimWorld.RitualOutcomeEffectWorker_BestowingCeremony"
+            };
+
+            foreach (var typeName in outcomeWorkerTypes)
+            {
+                var type = AccessTools.TypeByName(typeName);
+                if (type != null)
                 {
-                    harmony.Patch(original, null, new HarmonyMethod(postfix));
+                    var original = AccessTools.Method(type, "Apply");
+                    var postfix = AccessTools.Method(typeof(Patches.Patch_Funeral_Apply), "Postfix");
+                    if (original != null && postfix != null)
+                    {
+                        harmony.Patch(original, null, new HarmonyMethod(postfix));
+                        RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse-Psychology] Successfully applied manual patch for {typeName}.Apply");
+                    }
                 }
             }
             
