@@ -227,11 +227,23 @@ namespace RimSynapse.Psychology.Patches
                                 {
                                     SynapseGameComponent.Enqueue(() =>
                                     {
-                                        foreach (var kvp in response.eulogies)
+                                        // Runs later on the main thread, so the catch below does not
+                                        // cover it; without this, failures surface as a bare
+                                        // "Callback error" from ProcessMainThreadQueue.
+                                        try
                                         {
-                                            state.preGeneratedEulogies[kvp.Key] = kvp.Value;
+                                            if (state?.preGeneratedEulogies == null) return;
+
+                                            foreach (var kvp in response.eulogies)
+                                            {
+                                                state.preGeneratedEulogies[kvp.Key] = kvp.Value;
+                                            }
+                                            RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse-Psychology] Successfully pre-generated {state.preGeneratedEulogies.Count} speeches.");
                                         }
-                                        RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse-Psychology] Successfully pre-generated {state.preGeneratedEulogies.Count} speeches.");
+                                        catch (Exception ex)
+                                        {
+                                            RimSynapse.SynapseLogger.Error("psychology", $"[RimSynapse-Psychology] Failed to store pre-generated speeches: {ex}");
+                                        }
                                     });
                                 }
                             }
@@ -533,11 +545,24 @@ namespace RimSynapse.Psychology.Patches
                                 {
                                     SynapseGameComponent.Enqueue(() =>
                                     {
+                                      // This body runs later on the main thread, so the catch around
+                                      // PromptAsync's callback does not cover it. Without a local catch,
+                                      // anything thrown here escapes to ProcessMainThreadQueue and is
+                                      // reported as a bare "Callback error" with no context.
+                                      try
+                                      {
                                          var worldComp = Find.World?.GetComponent<SynapsePsychologyWorldComponent>();
                                          var coreWorldComp = Find.World?.GetComponent<RimSynapse.SynapseCoreWorldComponent>();
-                                         if (worldComp != null && coreWorldComp != null)
+                                         // A model can answer without the narrative field — the quicktest
+                                         // mock returns a bare {"success": true} — so treat a missing
+                                         // record as "nothing to save" rather than dereferencing null.
+                                         bool hasRecord = !string.IsNullOrEmpty(response.overallRecord)
+                                             || (response.eulogies != null && response.eulogies.Count > 0)
+                                             || (response.comments != null && response.comments.Count > 0);
+
+                                         if (worldComp != null && coreWorldComp != null && hasRecord)
                                          {
-                                             string finalRecord = response.overallRecord;
+                                             string finalRecord = response.overallRecord ?? "";
 
                                              if (response.eulogies != null && response.eulogies.Count > 0)
                                              {
@@ -576,6 +601,10 @@ namespace RimSynapse.Psychology.Patches
                                              coreWorldComp.pawnEventRecords.Add(newRecord);
                                              RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse-Psychology] Successfully saved ceremony record for {targetPawn.Name.ToStringShort}. Length: {finalRecord.Length}");
                                          }
+                                         else if (!hasRecord)
+                                         {
+                                             RimSynapse.SynapseLogger.Warn("psychology", $"[RimSynapse-Psychology] Ceremony response for {targetPawn?.Name?.ToStringShort ?? "unknown"} contained no narrative, eulogies or comments; skipping record.");
+                                         }
 
                                         if (response.pawnMemories != null)
                                         {
@@ -588,9 +617,10 @@ namespace RimSynapse.Psychology.Patches
                                                 if (p != null && placeholderTags.TryGetValue(pId, out string pTag))
                                                 {
                                                     var targetComp = p.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
-                                                    if (targetComp != null)
+                                                    if (targetComp?.memories != null)
                                                     {
-                                                        var targetMem = targetComp.memories.FirstOrDefault(m => m.tags.Contains(pTag));
+                                                        // Memories restored from a save can carry null tags.
+                                                        var targetMem = targetComp.memories.FirstOrDefault(m => m?.tags != null && m.tags.Contains(pTag));
                                                         if (targetMem != null)
                                                         {
                                                             targetMem.summary = explanation;
@@ -602,6 +632,11 @@ namespace RimSynapse.Psychology.Patches
                                             }
                                             RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse-Psychology] Successfully updated {updated} attendee memories.");
                                         }
+                                      }
+                                      catch (Exception ex)
+                                      {
+                                          RimSynapse.SynapseLogger.Error("psychology", $"[RimSynapse-Psychology] Failed to apply ceremony record for {targetPawn?.Name?.ToStringShort ?? "unknown"}: {ex}");
+                                      }
                                     });
                                 }
                             }
