@@ -2,6 +2,7 @@
 [b]Version:[/b] v0.5.2 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Psychology[/h1]
+[b][url=https://github.com/RimSynapse/Psychology/wiki]Official Wiki and Documentation[/url][/b]
 [b]Brings your colonists to life by giving them evolving memories, complex interpersonal trust, therapeutic sessions, and trauma responses using LLMs.[/b]
 
 Breathe genuine psychological depth into your colonists. RimSynapse Psychology replaces rigid vanilla opinions with a fluid Trust/Familiarity system and lets pawns accumulate core memories that dynamically reshape their traits and mental breaks based on LLM analysis.
