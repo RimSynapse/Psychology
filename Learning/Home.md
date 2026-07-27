@@ -7,7 +7,7 @@ Welcome to the documentation for the **RimSynapse Psychology** module. Below is 
 - [Psychology AI Backstories](Psychology_AI_Backstories)
 - [Psychology Clinical Evaluations](Psychology_Clinical_Evaluations)
 - [Psychology Faction Leaders](Psychology_Faction_Leaders)
-- [Psychology MCP Endpoints](Psychology_MCP_Endpoints)
+- [Psychology Game Tools](Psychology_Game_Tools)
 - [Psychology Mental Breaks](Psychology_Mental_Breaks)
 - [Psychology Therapy Sessions](Psychology_Therapy_Sessions)
 - [Psychology Trust And Familiarity](Psychology_Trust_And_Familiarity)

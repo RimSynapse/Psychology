@@ -1,8 +1,8 @@
-# Psychology MCP Tool-Calling Endpoints (Plain English Queries)
+# Psychology Game Tools (Plain English Queries)
 
-RimSynapse Psychology registers two advanced **Model Context Protocol (MCP)** tools with the Core engine. These endpoints expose the colonist's traits, sanity thresholds, social networks, and interaction history directly to the AI Storyteller and dialogue handlers.
+RimSynapse Psychology registers two advanced **game tools** with Core's native tool-calling engine. These tools expose the colonist's traits, sanity thresholds, social networks, and interaction history directly to the AI Storyteller and dialogue handlers.
 
-Below is the list of Psychology MCP endpoints, along with **plain English instructions** you can use to query them.
+Below is the list of Psychology's game tools, along with **plain English instructions** you can use to query them.
 
 ---
 

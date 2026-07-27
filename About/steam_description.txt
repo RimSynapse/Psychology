@@ -1,7 +1,8 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
-[b]Version:[/b] v0.5.2 (Target: RimWorld 1.6)
+[b]Version:[/b] v0.6.0 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Psychology[/h1]
+[b][url=https://github.com/RimSynapse/Psychology/wiki]Official Wiki and Documentation[/url][/b]
 [b]Brings your colonists to life by giving them evolving memories, complex interpersonal trust, therapeutic sessions, and trauma responses using LLMs.[/b]
 
 Breathe genuine psychological depth into your colonists. RimSynapse Psychology replaces rigid vanilla opinions with a fluid Trust/Familiarity system and lets pawns accumulate core memories that dynamically reshape their traits and mental breaks based on LLM analysis.
@@ -32,6 +33,14 @@ These ship when they are ready - no dates.
 
 ---
 
+[h2]Changelog (v0.6.0)[/h2]
+[list]
+[*] [b]NEW - Ceremonies recover instead of vanishing:[/b] When the language model returns a ceremony record the mod cannot read, the situation is now handed to Core's agent to salvage rather than being dropped with a warning. (Requires Core's escalation setting to be enabled.)
+[*] [b]Requires RimSynapse Core v0.6.0.[/b] Your saves and settings carry over unchanged.
+[*] [b]Documentation:[/b] In-game wiki guides updated; "MCP endpoints" renamed to game tools, matching Core's native tool-calling engine.
+[/list]
+
+---
 [h2]Changelog (v0.5.2)[/h2]
 [list]
 [*] [b]FIXED - Ceremony records crashed:[/b] Funerals and other ceremonies threw an error when the model answered without a written narrative. Incomplete responses are now skipped cleanly instead.
