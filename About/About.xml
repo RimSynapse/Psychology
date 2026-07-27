@@ -4,7 +4,7 @@
     <author>RimSynapse Team</author>
     <packageId>RimSynapse.Psychology</packageId>
     <url>https://github.com/RimSynapse/Psychology</url>
-    <modVersion>0.6.0</modVersion>
+    <modVersion>0.6.1</modVersion>
     <supportedVersions>
         <li>1.5</li>
         <li>1.6</li>
@@ -26,7 +26,7 @@
     </loadAfter>
     <description>
 Discord Community: https://discord.gg/eVBebZ2N9s
-Version: v0.5.2 (Target: RimWorld 1.6)
+Version: v0.6.1 (Target: RimWorld 1.6)
 
 RimSynapse - Psychology
 Official Wiki and Documentation: https://github.com/RimSynapse/Psychology/wiki
@@ -51,6 +51,13 @@ Brings your colonists to life by giving them evolving memories, complex interper
 - Psychological Addictions: Pawns may turn to specific drugs as a coping mechanism for specific negative memories.
 
 --- Changelog ---
+v0.6.1
+- Fixed: the in-game mod list showed v0.5.2 with no 0.6.0 notes; version and changelog now agree everywhere
+- Roadmap updated: 0.7 is Regions and Territories compatibility (groundwork for Factions, which will require Empire)
+v0.6.0
+- NEW: Ceremonies recover instead of vanishing - when the model returns a record the mod cannot read, the situation is handed to Core's agent to salvage (requires Core's escalation setting)
+- Requires Core v0.6.0; saves and settings carry over unchanged
+- In-game wiki guides updated; "MCP endpoints" renamed to game tools
 v0.5.2
 - Fixed: ceremony and funeral records crashed when the model replied without a narrative
 - Licence changed to PolyForm Noncommercial 1.0.0
