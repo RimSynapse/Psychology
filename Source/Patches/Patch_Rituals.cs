@@ -604,6 +604,17 @@ namespace RimSynapse.Psychology.Patches
                                          else if (!hasRecord)
                                          {
                                              RimSynapse.SynapseLogger.Warn("psychology", $"[RimSynapse-Psychology] Ceremony response for {targetPawn?.Name?.ToStringShort ?? "unknown"} contained no narrative, eulogies or comments; skipping record.");
+
+                                             // This is exactly the "nothing went as expected" moment
+                                             // the agent exists for. A cheap no-op unless the player
+                                             // enabled escalation; the warning above always logs.
+                                             RimSynapse.SynapseAgentEscalation.Escalate(new RimSynapse.SynapseEscalationContext
+                                             {
+                                                 Origin = "Psychology.CeremonyRecord",
+                                                 Expectation = $"A narrative record with eulogies for the {eventName} of {targetPawn?.Name?.ToStringShort ?? "a colonist"}",
+                                                 Observation = "The model's response deserialised, but overallRecord, eulogies and comments were all empty — the ceremony would leave no trace.",
+                                                 SuggestedGoal = "Decide whether this ceremony deserves a record; if so, produce a brief one-paragraph narrative and store it, otherwise conclude that skipping is acceptable."
+                                             });
                                          }
 
                                         if (response.pawnMemories != null)
