@@ -258,8 +258,7 @@ You MUST respond strictly in valid JSON format:
         {
             if (p.Faction != null && p.Faction.leader == p) return true;
             if (p.IsPrisonerOfColony) return true;
-            var coreComp = p.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
-            if (coreComp != null && coreComp.isResident) return true;
+            if (RimSynapse.SynapseCoreProviders.IsResident(p)) return true;
             if (RimSynapse.Expansions.Royalty.PsychologyRoyaltyIntegration.IsNoble(p)) return true;
             if (p.relations != null && p.relations.FamilyByBlood.Any(r => r.Faction == Faction.OfPlayer || r.IsPrisonerOfColony)) return true;
             return false;
