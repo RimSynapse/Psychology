@@ -3,7 +3,7 @@
     <Import Project="GamePath.props" />
 
     <PropertyGroup>
-        <TargetFramework>net472</TargetFramework>
+        <TargetFramework>net48</TargetFramework>
         <AssemblyName>RimSynapsePsychology</AssemblyName>
         <RootNamespace>RimSynapse.Psychology</RootNamespace>
         <LangVersion>9.0</LangVersion>
