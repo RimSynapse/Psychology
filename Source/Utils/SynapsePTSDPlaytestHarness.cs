@@ -78,7 +78,11 @@ namespace RimSynapse.Psychology.Utils
                 new { label = "Bloodlust",    defName = "Bloodlust",   degree = 0 }
             };
 
-            string reportPath = "d:\\github\\rimsynapse\\Core\\counseling_simulation_report.txt";
+            // Written next to RimWorld's config so the report lands somewhere that exists on
+            // every install. This was hardcoded to a d:\ checkout, so the write always failed
+            // with "Could not find a part of the path" on any other machine.
+            string reportPath = System.IO.Path.Combine(
+                GenFilePaths.ConfigFolderPath, "counseling_simulation_report.txt");
 
             try
             {
