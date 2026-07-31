@@ -1,5 +1,5 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
-[b]Version:[/b] v0.6.1 (Target: RimWorld 1.6)
+[b]Version:[/b] v0.7.0 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Psychology[/h1]
 [b][url=https://github.com/RimSynapse/Psychology/wiki]Official Wiki and Documentation[/url][/b]
@@ -32,6 +32,14 @@ Breathe genuine psychological depth into your colonists. RimSynapse Psychology r
 [*] [b]0.10 - Cross-Mod Capability Passes:[/b] Bringing every module back together for another pass over what the whole set can do.
 [/list]
 These ship when they are ready - no dates.
+
+---
+
+[h2]Changelog (v0.7.0) - Regions and Territories Compatibility[/h2]
+[list]
+[*] Moves in step with RimSynapse Core v0.7.0.
+[*] Requires Core v0.7.0; saves and settings carry over unchanged.
+[/list]
 
 ---
 
