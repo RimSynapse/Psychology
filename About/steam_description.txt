@@ -25,11 +25,11 @@ Breathe genuine psychological depth into your colonists. RimSynapse Psychology r
 
 [h2]Roadmap[/h2]
 [list]
-[*] [b]0.6 - Agent and Tool Foundation:[/b] ✅ Delivered in v0.6.0.
-[*] [b]0.7 - Regions and Territories Compatibility:[/b] Basic pass-through alongside Empire Refactored and World Domination. Territories set tax rates; the regular game mechanics are left alone.
-[*] [b]0.8 - Demographics, News and Narrative Voice:[/b] Regional ideology and new map overlays, a newspaper driven by what actually happens on the world map, Aura's own personality, and local text-to-speech.
-[*] [b]0.9 - Factions and Living Societies:[/b] State ideologies, conversion and ideological spread, ideological sites and spies - building toward living NPC societies.
-[*] [b]0.10 - Cross-Mod Capability Passes:[/b] Bringing every module back together for another pass over what the whole set can do.
+[*] [b]0.6 - Agent and Tool Foundation:[/b] ✅ Delivered in v0.6.0 - the per-pawn memory bank and psychological profiling that Core brokers to the rest of the suite.
+[*] [b]0.7 - Regions and Territories Compatibility:[/b] Current release - profiling and memory carried forward unchanged under the new shared infrastructure.
+[*] [b]0.8 - Demographics, News and Narrative Voice:[/b] Nightly clinical reviews moved onto Core's shared deadline batch, a backstory-arrival memory contract, and context hooks that let other modules and faction leaders read a colonist's psychology.
+[*] [b]0.9 - Factions and Living Societies:[/b] Living social dynamics - colony cliques and a rumour mill, familiarity-milestone events, a trait-history timeline and social-network view, and auto-running therapy sessions (with Conversations).
+[*] [b]0.10 - Cross-Mod Capability Passes:[/b] Another pass over how psychology feeds factions, news and narration across the suite.
 [/list]
 These ship when they are ready - no dates.
 

@@ -51,11 +51,11 @@ Brings your colonists to life by giving them evolving memories, complex interper
 - Psychological Addictions: Pawns may turn to specific drugs as a coping mechanism for specific negative memories.
 
 --- Roadmap ---
-0.6 - Agent and Tool Foundation: delivered in v0.6.0.
-0.7 - Regions and Territories Compatibility: basic pass-through alongside Empire Refactored and World Domination. Territories set tax rates; the regular game mechanics are left alone.
-0.8 - Demographics, News and Narrative Voice: regional ideology and new map overlays, a newspaper driven by what actually happens on the world map, Aura's own personality, and local text-to-speech.
-0.9 - Factions and Living Societies: state ideologies, conversion and ideological spread, ideological sites and spies - building toward living NPC societies.
-0.10 - Cross-Mod Capability Passes: bringing every module back together for another pass over what the whole set can do.
+0.6 - Agent and Tool Foundation: Delivered in v0.6.0 - the per-pawn memory bank and psychological profiling that Core brokers to the rest of the suite.
+0.7 - Regions and Territories Compatibility: Current release - profiling and memory carried forward unchanged under the new shared infrastructure.
+0.8 - Demographics, News and Narrative Voice: Nightly clinical reviews moved onto Core's shared deadline batch, a backstory-arrival memory contract, and context hooks that let other modules and faction leaders read a colonist's psychology.
+0.9 - Factions and Living Societies: Living social dynamics - colony cliques and a rumour mill, familiarity-milestone events, a trait-history timeline and social-network view, and auto-running therapy sessions (with Conversations).
+0.10 - Cross-Mod Capability Passes: Another pass over how psychology feeds factions, news and narration across the suite.
 These ship when they are ready - no dates.
 
 --- Changelog ---
