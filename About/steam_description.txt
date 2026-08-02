@@ -25,8 +25,6 @@ Breathe genuine psychological depth into your colonists. RimSynapse Psychology r
 
 [h2]Roadmap[/h2]
 [list]
-[*] [b]0.6 - Agent and Tool Foundation:[/b] ✅ Delivered in v0.6.0 - the per-pawn memory bank and psychological profiling that Core brokers to the rest of the suite.
-[*] [b]0.7 - Regions and Territories Compatibility:[/b] Current release - profiling and memory carried forward unchanged under the new shared infrastructure.
 [*] [b]0.8 - Demographics, News and Narrative Voice:[/b] Nightly clinical reviews moved onto Core's shared deadline batch, a backstory-arrival memory contract, and context hooks that let other modules and faction leaders read a colonist's psychology.
 [*] [b]0.9 - Factions and Living Societies:[/b] Living social dynamics - colony cliques and a rumour mill, familiarity-milestone events, a trait-history timeline and social-network view, and auto-running therapy sessions (with Conversations).
 [*] [b]0.10 - Cross-Mod Capability Passes:[/b] Another pass over how psychology feeds factions, news and narration across the suite.
@@ -40,39 +38,7 @@ These ship when they are ready - no dates.
 [*] Moves in step with RimSynapse Core v0.7.0.
 [*] Requires Core v0.7.0; saves and settings carry over unchanged.
 [/list]
-
----
-
-[h2]Changelog (v0.6.1)[/h2]
-[list]
-[*] [b]FIXED - mod list metadata:[/b] The in-game mod list still showed v0.5.2 with no v0.6.0 notes. Version and changelog now agree in every place they are stated.
-[*] [b]Roadmap updated:[/b] 0.7 is now Regions and Territories compatibility - the groundwork the Factions work depends on. Everything after it shifts up one release.
-[/list]
-
----
-[h2]Changelog (v0.6.0)[/h2]
-[list]
-[*] [b]NEW - Ceremonies recover instead of vanishing:[/b] When the language model returns a ceremony record the mod cannot read, the situation is now handed to Core's agent to salvage rather than being dropped with a warning. (Requires Core's escalation setting to be enabled.)
-[*] [b]Requires RimSynapse Core v0.6.0.[/b] Your saves and settings carry over unchanged.
-[*] [b]Documentation:[/b] In-game wiki guides updated; "MCP endpoints" renamed to game tools, matching Core's native tool-calling engine.
-[/list]
-
----
-[h2]Changelog (v0.5.2)[/h2]
-[list]
-[*] [b]FIXED - Ceremony records crashed:[/b] Funerals and other ceremonies threw an error when the model answered without a written narrative. Incomplete responses are now skipped cleanly instead.
-[*] [b]FIXED - Clearer error reporting:[/b] Background AI callbacks now name the feature that failed rather than logging a bare error.
-[*] [b]Licence:[/b] Now PolyForm Noncommercial 1.0.0. Free to use, modify and share for any noncommercial purpose.
-[/list]
-
----
-
-[h2]Changelog (v0.5.1)[/h2]
-[list]
-[*] [b]NEW: Memory Tab Visibility filters:[/b] Hides cluttering short-term social and conversation memories by default, adding a "Show Short Term Memories" checkbox toggle to show them.
-[*] [b]NEW: Dynamic Warden recruitment patches:[/b] Re-engineered the prisoner recruitment success patch to link dynamically to `RecruitChance` via reflection, preventing compatibility crashes.
-[*] [b]Performance Tuning:[/b] Substantially optimized background memory processing logic.
-[/list]
+[b]Full version history:[/b] [url=https://github.com/RimSynapse/Psychology/wiki/Changelog]github.com/RimSynapse/Psychology/wiki[/url]
 
 ---
 
