@@ -112,7 +112,8 @@ namespace RimSynapse.Psychology.API
 
         private static void ApplyAbandonmentRisk(Pawn pawn, int riskScore)
         {
-            if (riskScore > 90 && pawn.IsColonist && !pawn.Downed && !pawn.InMentalState)
+            float threshold = RimSynapsePsychologyMod.Settings?.abandonmentThreshold ?? 90f;
+            if (riskScore > threshold && pawn.IsColonist && !pawn.Downed && !pawn.InMentalState)
             {
                 SynapseGameComponent.Enqueue(() =>
                 {
@@ -160,10 +161,11 @@ namespace RimSynapse.Psychology.API
                 dailyPressure = UnityEngine.Mathf.Clamp(dailyPressure, 0f, 1f);
 
                 float resistance = SynapseTraitPolicy.ResistanceFactor(trait);
-                float pressure = coreComp.AccumulateTraitPressure(trait, dailyPressure, direction, resistance, now);
+                float pressure = coreComp.AccumulateTraitPressure(trait, dailyPressure, direction, resistance, now,
+                    RimSynapse.Comps.SynapseCorePawnComp.TraitPressureDecayPerDay);
 
                 // Protected traits require overwhelming, sustained pressure before removal.
-                float threshold = ShiftThreshold;
+                float threshold = RimSynapsePsychologyMod.Settings?.shiftThreshold ?? ShiftThreshold;
                 if (direction == "remove" && SynapseTraitPolicy.IsProtected(trait)) threshold *= 2f;
 
                 trajectory.Add($"{trait} {pressure:0.00}/{threshold:0.0} → {direction}");

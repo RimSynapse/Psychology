@@ -159,8 +159,11 @@ namespace RimSynapse.Psychology.Comps
                     moodSamples++;
                     
                     int currentDay = GenDate.DaysPassed;
-                    
-                    if (currentDay > lastJournalUpdateDay && !isAwaitingJournalUpdate)
+
+                    // Cadence gate (Stage 3, #49): run the eval every N days per colonist. Default 1 = nightly.
+                    int cadence = RimSynapse.Psychology.RimSynapsePsychologyMod.Settings?.evalCadence ?? 1;
+                    if (cadence < 1) cadence = 1;
+                    if (currentDay - lastJournalUpdateDay >= cadence && !isAwaitingJournalUpdate)
                     {
                         bool isAsleep = pawn.jobs != null && pawn.jobs.curDriver != null && pawn.jobs.curDriver.asleep;
                         int currentHour = GenDate.HourOfDay(Find.TickManager.TicksAbs, Find.WorldGrid.LongLatOf(pawn.Map.Tile).x);
