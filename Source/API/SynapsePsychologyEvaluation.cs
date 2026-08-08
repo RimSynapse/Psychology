@@ -43,6 +43,19 @@ namespace RimSynapse.Psychology.API
             return $"Lifetime violence against the living: {humanlikeKills} humanlike, {animalKills} animal ({living} living kills total)";
         }
 
+        /// <summary>Human-readable accumulated trait trajectory for the eval prompt (Stage 2).</summary>
+        public static string DescribeTraitPressures(RimSynapse.Comps.SynapseCorePawnComp coreComp)
+        {
+            if (coreComp == null || coreComp.traitPressures == null || coreComp.traitPressures.Count == 0) return "None";
+            var parts = new List<string>();
+            foreach (var kvp in coreComp.traitPressures)
+            {
+                var tp = kvp.Value;
+                parts.Add($"{kvp.Key}: {tp.pressure:0.00} toward {tp.direction ?? "?"} (peak {tp.peak:0.00})");
+            }
+            return string.Join(", ", parts);
+        }
+
         public static void QueueDailyPsychologyReview(Pawn pawn, float averageMood, System.Collections.Generic.List<RimSynapse.Models.WeightedMemory> dailyEvents, Action<bool> onComplete = null, bool isOpportunistic = false)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -70,9 +83,12 @@ You must also provide an 'AbandonmentRiskScore' (0-100) representing how likely 
 
 Finally, output a 'SocialAdjustments' object reflecting changes in their Trust (-100 to +100) and Familiarity (0 to 100) with other colonists based on recent events. Use the colonist's short name as the key. Trust offsets should be between -15 and +15. Familiarity offsets should be positive (0 to +10).
 
-Additionally, evaluate if their recent experiences are profound enough to change their personality traits. If so, return a 'TraitChanges' object with an 'Add' array (containing RimWorld trait defNames to add, e.g. 'Bloodlust', 'Nerves') and/or a 'Remove' array (trait defNames to remove). Keep this rare; leave arrays empty if no profound change occurred.
-IMPORTANT — violence vs. the living: traits that reflect a taste for killing or cruelty (e.g. 'Bloodlust') require evidence of harming LIVING creatures (humanlikes or animals). Destroying inanimate objects, mining, or repeatedly attacking wrecked machinery is NOT violence against the living and must NEVER, on its own, justify adding 'Bloodlust' or removing protective/steadfast traits. If today's activity was primarily against objects, say so explicitly and treat any violent-trait shift as unlikely.
-The colonist currently has the following dynamically added traits (which you previously added): {DYNAMIC_TRAITS}. If you determine the pawn has moved past the psychological phase that caused these traits, you should include them in the 'Remove' array so they can decay.
+Additionally, assess whether recent experiences are building toward a personality change. Do NOT apply changes directly — personality shifts accumulate over MULTIPLE days and a single day rarely fires one. Instead return:
+- 'PersonalityShiftLikelihood': one of ""none"" | ""low"" | ""moderate"" | ""high"" — your overall judgement of whether ANY shift is warranted right now. If ""none"" or ""low"", today contributes no pressure toward any change.
+- 'PersonalityShiftAssessment': an array of per-candidate-trait evidence for TODAY ONLY. Each entry: { ""trait"": <RimWorld trait defName>, ""direction"": ""add"" | ""remove"", ""dailyPressure"": 0.0-1.0 (how strong TODAY's evidence is), ""rationale"": <one sentence> }. Leave the array empty if nothing is building.
+IMPORTANT — violence vs. the living: traits that reflect a taste for killing or cruelty (e.g. 'Bloodlust') require evidence of harming LIVING creatures (humanlikes or animals). Destroying inanimate objects, mining, or repeatedly attacking wrecked machinery is NOT violence against the living and must NEVER, on its own, justify adding 'Bloodlust' or removing protective/steadfast traits. If today's activity was primarily against objects, set dailyPressure near 0 and likelihood ""none""/""low"".
+IMPORTANT — trait resistance: respect the resistance values below. Protected traits must NOT be removed without overwhelming, sustained evidence.
+The colonist currently has these AI-added traits (added by you previously): {DYNAMIC_TRAITS}. Their current traits with resistance: {TRAIT_RESISTANCE}. Accumulated trait pressure so far (trajectory across days): {TRAIT_PRESSURES}.
 
 You MUST respond strictly in valid JSON format. Do not include markdown formatting or extra text.
 {
@@ -87,10 +103,10 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
   ""Addiction"": ""1-2 sentences..."",
   ""Summary"": ""1-2 sentences..."",
   ""AbandonmentRiskScore"": 0,
-  ""TraitChanges"": {
-    ""Add"": [""Bloodlust""],
-    ""Remove"": [""Kind""]
-  },
+  ""PersonalityShiftLikelihood"": ""none"",
+  ""PersonalityShiftAssessment"": [
+    { ""trait"": ""Bloodlust"", ""direction"": ""add"", ""dailyPressure"": 0.15, ""rationale"": ""Repeated combat, but only against an inert vehicle - weak signal."" }
+  ],
   ""SocialAdjustments"": {
     ""ColonistName1"": {
       ""trustOffset"": 2.5,
@@ -196,6 +212,10 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
                 dynamicTraitsStr = string.Join(", ", pawnComp.dynamicTraits.Select(t => $"{t.traitDef.defName} (Added {((Find.TickManager.TicksGame - t.tickAdded)/60000f):F1} days ago for: {t.reason})"));
             }
             systemPrompt = systemPrompt.Replace("{DYNAMIC_TRAITS}", dynamicTraitsStr);
+
+            // Stage 2: feed the trait-resistance dimension and the accumulated cross-day trajectory.
+            systemPrompt = systemPrompt.Replace("{TRAIT_RESISTANCE}", SynapseTraitPolicy.DescribeResistanceForPrompt(pawn));
+            systemPrompt = systemPrompt.Replace("{TRAIT_PRESSURES}", DescribeTraitPressures(coreComp));
 
             string userMessage = $@"Patient Name: {pawn.Name.ToStringShort}
 Gender: {pawn.gender}

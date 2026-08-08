@@ -71,6 +71,9 @@ namespace RimSynapse.Psychology.Comps
         public bool isAwaitingJournalUpdate = false;
         public float savedAverageMood = 0.5f;
 
+        // Stage 2: cooldown gate between AI-driven trait changes (#46). Absolute tick of the last change.
+        public long lastTraitChangeTick = -1;
+
         private const int TickIntervalDay = 60000;
         private const int TickInterval6Hours = 15000;
 
@@ -100,6 +103,7 @@ namespace RimSynapse.Psychology.Comps
             if (dynamicTraits == null) dynamicTraits = new List<RimSynapse.Psychology.Models.DynamicTraitRecord>();
             if (therapyTranscripts == null) therapyTranscripts = new List<RimSynapse.Psychology.Models.TherapyTranscript>();
             Scribe_Values.Look(ref savedAverageMood, "savedAverageMood", 0.5f);
+            Scribe_Values.Look(ref lastTraitChangeTick, "lastTraitChangeTick", -1L);
             Scribe_Values.Look(ref hasCheckedAdulthood, "hasCheckedAdulthood", false);
 
             Scribe_Collections.Look(ref medicalProfile, "medicalProfile", LookMode.Value, LookMode.Value);
