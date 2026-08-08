@@ -59,6 +59,33 @@ namespace RimSynapse.Psychology.API
                 GetRecentSocialInteractionsHandler
             );
 
+            // Debug tools (Psychology#52): live-LLM memory generation and evaluation.
+            SynapseToolRegistry.RegisterTool(
+                "debug_generate_memory",
+                "DEBUG: generate a memory for a colonist using the live LLM from a described event; the raw model response is logged ([SYNAPSE-DEBUG]) and shown in-game, then the memory is added.",
+                new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        pawnName = new { type = "string", description = "Colonist to generate a memory for" },
+                        @event = new { type = "string", description = "Optional event description to base the memory on" }
+                    },
+                    required = new[] { "pawnName" }
+                },
+                SynapsePsychologyDebug.GenerateMemoryHandler, false, null, true);
+
+            SynapseToolRegistry.RegisterTool(
+                "debug_run_evaluation",
+                "DEBUG: run the daily psychology evaluation for a colonist using the live LLM; the parsed result (clinical assessment + personality trajectory) is logged and shown in-game.",
+                new
+                {
+                    type = "object",
+                    properties = new { pawnName = new { type = "string", description = "Colonist to evaluate" } },
+                    required = new[] { "pawnName" }
+                },
+                SynapsePsychologyDebug.RunEvaluationHandler, false, null, true);
+
             SynapseLogger.Message("[RimSynapse Psychology] Dynamic MCP tools registered with Core.");
         }
 
