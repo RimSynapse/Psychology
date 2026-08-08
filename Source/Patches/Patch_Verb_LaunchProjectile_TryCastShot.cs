@@ -57,11 +57,11 @@ namespace RimSynapse.Psychology.Patches
                     if (coreComp != null)
                     {
                         long currentTick = Find.TickManager?.TicksAbs ?? 0;
-                        coreComp.memories.Add(new RimSynapse.Models.WeightedMemory
+                        coreComp.AddMemory(new RimSynapse.Models.WeightedMemory
                         {
                             summary = $"Cured of PTSD through supervised shooting practice with {supervisor.LabelShort}.",
-                            weight = 10f,
-                            baseWeight = 10f,
+                            weight = 1.0f,
+                            baseWeight = 1.0f,
                             decayRate = 0f,
                             isLongTerm = true,
                             tags = new List<string> { "TraitShift", "Desensitization", "Recovery" },

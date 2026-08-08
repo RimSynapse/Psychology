@@ -81,11 +81,11 @@ Skills: {skillBonuses}";
                                 coreComp.hometown = parsed["Hometown"].ToString();
 
                             long childTick = SynapseDateHelper.GetChildhoodMemoryTick(pawn);
-                            coreComp.memories.Add(new WeightedMemory
+                            coreComp.AddMemory(new WeightedMemory
                             {
                                 summary = memoryText,
-                                weight = 2.0f,
-                                baseWeight = 2.0f,
+                                weight = 0.8f,
+                                baseWeight = 0.8f,
                                 decayRate = 0f,
                                 tags = tags,
                                 memoryType = "BackstoryChildhood",
@@ -180,11 +180,11 @@ Skills: {skillBonuses}{hometownContext}{childhoodContext}";
                                 tags = arr.Select(t => t.ToString()).ToList();
 
                             long adultTick = SynapseDateHelper.GetAdulthoodMemoryTick(pawn);
-                            coreComp.memories.Add(new WeightedMemory
+                            coreComp.AddMemory(new WeightedMemory
                             {
                                 summary = memoryText,
-                                weight = 2.0f,
-                                baseWeight = 2.0f,
+                                weight = 0.8f,
+                                baseWeight = 0.8f,
                                 decayRate = 0f,
                                 tags = tags,
                                 memoryType = "BackstoryAdulthood",

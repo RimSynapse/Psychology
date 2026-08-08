@@ -196,17 +196,12 @@ namespace RimSynapse.Psychology.UI
             // Sort chronologically (oldest first) using absTick
             var sortedMemories = coreComp.memories.OrderBy(m => m.absTick).ToList();
 
-            // Filter out social/conversation memories unless DevMode is on OR showShortTermMemories is enabled
+            // Tier split (design §5.8): short-term vs long-term is an emergent property of weight/salience
+            // (isLongTerm, set by consolidation), not a memoryType string blocklist. When short-term is
+            // hidden, show only the consolidated long-term memories.
             if (!Prefs.DevMode && !showShortTermMemories)
             {
-                sortedMemories = sortedMemories.Where(m => 
-                    m.memoryType != "social" && 
-                    m.memoryType != "social_chat" && 
-                    m.memoryType != "non_response" &&
-                    m.memoryType != "conversation" &&
-                    m.memoryType != "overheard" &&
-                    !(m.memoryType == "EventReflection" && m.tags != null && (m.tags.Contains("Chitchat") || m.tags.Contains("chitchat") || m.tags.Contains("DeepTalk") || m.tags.Contains("deeptalk")))
-                ).ToList();
+                sortedMemories = sortedMemories.Where(m => m.isLongTerm).ToList();
             }
 
             if (sortedMemories.Count == 0)

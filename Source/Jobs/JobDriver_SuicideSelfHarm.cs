@@ -80,10 +80,11 @@ namespace RimSynapse.Psychology.Jobs
 
                 if (part != null)
                 {
-                    // Apply heavy damage multiplier to ensure suicide is lethal
+                    // Apply heavy damage multiplier to ensure suicide is lethal (tunable, Stage 3)
+                    float suicideMult = RimSynapse.Psychology.RimSynapsePsychologyMod.Settings?.suicideDamageMultiplier ?? 5.0f;
                     var dinfo = new DamageInfo(
                         def: damageDef,
-                        amount: damageAmount * 5.0f,
+                        amount: damageAmount * suicideMult,
                         armorPenetration: armorPenetration,
                         angle: -1f,
                         instigator: p,

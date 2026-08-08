@@ -42,7 +42,7 @@ namespace RimSynapse.Psychology.API
                 return;
             }
 
-            comp.memories.Add(memory);
+            comp.AddMemory(memory); // routes through Core: normalises weight to 0-1, assigns memId, indexes
             RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse-Psychology] Memory added to {pawn.Name}: \"{memory.summary}\" (type: {memory.memoryType}, weight: {memory.weight})");
         }
 
@@ -59,7 +59,10 @@ namespace RimSynapse.Psychology.API
 
             if (match != null)
             {
+                // Under the normalised 0-1 scale the 1.0 ceiling is correct — reinforcement raises,
+                // never lowers, a strong memory (the old crush was purely the scale mismatch).
                 match.weight = Math.Min(1.0f, match.weight + bumpAmount);
+                match.lastReferencedTick = Find.TickManager?.TicksAbs ?? match.lastReferencedTick;
                 match.timesReferenced++;
             }
         }

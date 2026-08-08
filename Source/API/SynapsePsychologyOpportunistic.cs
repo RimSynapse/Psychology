@@ -41,8 +41,9 @@ INSTRUCTIONS:
    - If life is exceptionally comfortable (high mood/wealth), they might find recovery from tragedy easier.
    - If they have traits like Psychopath, they might focus on cold rain or practical matters rather than emotional loss.
 2. EVENT SCALE & LENGTH:
-   - MAJOR EVENTS (e.g., death of a spouse/close relative, first kill, a colonist joining, legendary craft, major raid): Generate a detailed 2-3 sentence narrative memory. Set Weight between 3.0 and 5.0, and Decay between 0.0 and 0.005 (or 0.0 for permanent defining memories).
-   - STANDARD/MINOR EVENTS: Generate a brief, single-sentence memory (10-15 words). Set Weight between 0.1 and 1.5, and Decay between 0.05 and 0.3.
+   - MAJOR/DEFINING EVENTS (e.g., death of a spouse/close relative, first kill, a colonist joining, legendary craft, major raid): Generate a detailed 2-3 sentence narrative memory. Set Weight between 0.5 and 1.0 (use 0.8-1.0 for permanent, defining memories), and Decay between 0.0 and 0.05 (0.0 for permanent).
+   - STANDARD/MINOR EVENTS: Generate a brief, single-sentence memory (10-15 words). Set Weight between 0.05 and 0.5, and Decay between 0.1 and 0.5.
+   (All weights are on a 0.0-1.0 scale.)
 3. DESENSITIZATION: Consider their lifetime statistics. A veteran killer is not traumatized by another death, but their first kill is life-altering.
 
 You MUST respond strictly in valid JSON format:
@@ -52,8 +53,8 @@ You MUST respond strictly in valid JSON format:
       ""PawnId"": ""ThingID_Here"",
       ""Summary"": ""Though the loss of his friend weighed on Fred, his immediate starvation and the falling cold rain occupied his mind, leaving him feeling strangely detached from the tragedy."",
       ""Tags"": [""Death"", ""Grief"", ""Starvation""],
-      ""Weight"": 1.2,
-      ""Decay"": 0.05
+      ""Weight"": 0.6,
+      ""Decay"": 0.15
     }
   ]
 }";
@@ -110,7 +111,7 @@ You MUST respond strictly in valid JSON format:
                                             summary = memDict["Summary"].ToString(),
                                             weight = Convert.ToSingle(memDict["Weight"]),
                                             baseWeight = Convert.ToSingle(memDict["Weight"]),
-                                            decayRate = Convert.ToSingle(memDict["Decay"]) * RimSynapsePsychologyMod.Settings.memoryDecayMultiplier,
+                                            decayRate = Convert.ToSingle(memDict["Decay"]), // class-driven decay applies the multiplier at decay time
                                             tags = tagsList,
                                             memoryType = "EventReflection",
                                             absTick = SynapseDateHelper.GameTickToAbsTick(pastEvent.gameTick),

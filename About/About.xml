@@ -4,7 +4,7 @@
     <author>RimSynapse Team</author>
     <packageId>RimSynapse.Psychology</packageId>
     <url>https://github.com/RimSynapse/Psychology</url>
-    <modVersion>0.7.0</modVersion>
+    <modVersion>0.7.1</modVersion>
     <supportedVersions>
         <li>1.5</li>
         <li>1.6</li>
@@ -26,7 +26,7 @@
     </loadAfter>
     <description>
 Discord Community: https://discord.gg/eVBebZ2N9s
-Version: v0.7.0 (Target: RimWorld 1.6)
+Version: v0.7.1 (Target: RimWorld 1.6)
 
 RimSynapse - Psychology
 Official Wiki and Documentation: https://github.com/RimSynapse/Psychology/wiki
@@ -51,29 +51,25 @@ Brings your colonists to life by giving them evolving memories, complex interper
 - Psychological Addictions: Pawns may turn to specific drugs as a coping mechanism for specific negative memories.
 
 --- Roadmap ---
-0.6 - Agent and Tool Foundation: delivered in v0.6.0.
-0.7 - Regions and Territories Compatibility: basic pass-through alongside Empire Refactored and World Domination. Territories set tax rates; the regular game mechanics are left alone.
-0.8 - Demographics, News and Narrative Voice: regional ideology and new map overlays, a newspaper driven by what actually happens on the world map, Aura's own personality, and local text-to-speech.
-0.9 - Factions and Living Societies: state ideologies, conversion and ideological spread, ideological sites and spies - building toward living NPC societies.
-0.10 - Cross-Mod Capability Passes: bringing every module back together for another pass over what the whole set can do.
+0.8 - Demographics, News and Narrative Voice: Nightly clinical reviews moved onto Core's shared deadline batch, a backstory-arrival memory contract, and context hooks that let other modules and faction leaders read a colonist's psychology.
+0.9 - Factions and Living Societies: Living social dynamics - colony cliques and a rumour mill, familiarity-milestone events, a trait-history timeline and social-network view, and auto-running therapy sessions (with Conversations).
+0.10 - Cross-Mod Capability Passes: Another pass over how psychology feeds factions, news and narration across the suite.
 These ship when they are ready - no dates.
 
---- Changelog ---
-v0.7.0 - Regions and Territories Compatibility
+--- Changelog (v0.7.1) - Gradual personality and smarter memory ---
+- Fixed the headline bug: a colonist could gain Bloodlust and lose a steadfast trait just from repeatedly attacking an object (like a wrecked vehicle). Violence against inert objects is now clearly distinguished from harming the living and can no longer drive bloodthirsty personality changes.
+- NEW - Gradual, multi-day personality shifts: traits no longer flip in a single day. Evidence builds as "pressure" over several days, is resisted by steadfast traits (which also protect themselves from removal), and only fires once sustained - and an evaluation that calls a shift "unlikely" can no longer flip a trait at all.
+- NEW - Trait-change guardrails: only sanctioned traits can be added or removed (never, for example, Psychopath), at most one change per evaluation, with a cooldown between changes.
+- NEW - Mod settings sliders: trait-shift threshold and pressure decay, memory consolidation, abandonment risk, suicide damage, opinion/trust blend, and an evaluation cadence to cut LLM token cost.
+- Fixed: AI-driven mental breaks now actually fire (the request was previously left inert).
+- Fixed: therapy-session summaries are now kept as durable memories on both colonists instead of being discarded.
+- The daily evaluation now separates today from a lifetime of history, and the memory panel splits short vs long-term by real importance.
+
+--- Changelog (v0.7.0) - Regions and Territories Compatibility ---
 - Moves in step with RimSynapse Core v0.7.0.
 - Requires Core v0.7.0; saves and settings carry over unchanged.
-v0.6.1
-- Fixed: the in-game mod list showed v0.5.2 with no 0.6.0 notes; version and changelog now agree everywhere
-- Roadmap updated: 0.7 is Regions and Territories compatibility (groundwork for Factions, which will require Empire)
-v0.6.0
-- NEW: Ceremonies recover instead of vanishing - when the model returns a record the mod cannot read, the situation is handed to Core's agent to salvage (requires Core's escalation setting)
-- Requires Core v0.6.0; saves and settings carry over unchanged
-- In-game wiki guides updated; "MCP endpoints" renamed to game tools
-v0.5.2
-- Fixed: ceremony and funeral records crashed when the model replied without a narrative
-- Licence changed to PolyForm Noncommercial 1.0.0
-v0.4.0
-- Updated to support RimSynapse Core v0.4.0 (Multi-provider routing and Image generation).
+
+Full version history: https://github.com/RimSynapse/Psychology/wiki/Changelog
 
 --- Compatibility Matrix ---
 - Royalty DLC: Compatible and Optional. Integrates memories of nobility and royal power.

@@ -115,11 +115,11 @@ Write a vivid childhood memory grounded in these skills.";
                 }
 
                 long childTick = SynapseDateHelper.GetChildhoodMemoryTick(pawn);
-                coreComp.memories.Add(new WeightedMemory
+                coreComp.AddMemory(new WeightedMemory
                 {
                     summary = memoryText,
-                    weight = 3.0f,
-                    baseWeight = 3.0f,
+                    weight = 0.8f,
+                    baseWeight = 0.8f,
                     decayRate = 0f,
                     tags = tags,
                     memoryType = "BackstoryChildhood",
@@ -225,11 +225,11 @@ Write a vivid adulthood memory grounded in these skills.";
                 }
 
                 long adultTick = SynapseDateHelper.GetAdulthoodMemoryTick(pawn);
-                coreComp.memories.Add(new WeightedMemory
+                coreComp.AddMemory(new WeightedMemory
                 {
                     summary = memoryText,
-                    weight = 3.0f,
-                    baseWeight = 3.0f,
+                    weight = 0.8f,
+                    baseWeight = 0.8f,
                     decayRate = 0f,
                     tags = tags,
                     memoryType = "BackstoryAdulthood",
@@ -331,11 +331,11 @@ Synthesize their psychological profile.";
 
                             if (parsed.TryGetValue("FirstImpression", out object impression))
                             {
-                                coreComp.memories.Add(new WeightedMemory
+                                coreComp.AddMemory(new WeightedMemory
                                 {
                                     summary = impression.ToString(),
-                                    weight = 4.0f,
-                                    baseWeight = 4.0f,
+                                    weight = 0.6f,
+                                    baseWeight = 0.6f,
                                     decayRate = 0.005f,
                                     tags = new List<string> { "Arrival", "FirstImpression" },
                                     memoryType = "Arrival",

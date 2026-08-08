@@ -111,9 +111,39 @@ namespace RimSynapse.Psychology
 
             listingStandard.Label($"Memory Decay Speed: {Settings.memoryDecayMultiplier:F1}x", tooltip: "How fast colonists forget past events. Higher means they let go of grudges and trauma faster.");
             Settings.memoryDecayMultiplier = listingStandard.Slider(Settings.memoryDecayMultiplier, 0.1f, 5.0f);
-            
+
             listingStandard.Label($"Sensitivity Minimum Burden Threshold: {Settings.sensitivityThreshold:F1}");
             Settings.sensitivityThreshold = listingStandard.Slider(Settings.sensitivityThreshold, 0.1f, 5.0f);
+
+            // ── Personality & memory tuning (Stage 3) ───────────────
+            listingStandard.GapLine();
+            listingStandard.Label("Personality & memory tuning");
+
+            listingStandard.Label($"Trait Shift Threshold: {Settings.shiftThreshold:F1}", tooltip: "Accumulated multi-day pressure needed before a personality trait actually changes. Higher = rarer changes.");
+            Settings.shiftThreshold = listingStandard.Slider(Settings.shiftThreshold, 0.5f, 3.0f);
+
+            listingStandard.Label($"Trait Pressure Decay/day: {Settings.shiftPressureDecay:F2}", tooltip: "How fast trait pressure fades on days without fresh evidence. Higher = a bad day lingers less.");
+            Settings.shiftPressureDecay = listingStandard.Slider(Settings.shiftPressureDecay, 0.0f, 1.0f);
+
+            listingStandard.Label($"Memory Consolidation Threshold: {Settings.consolidationThreshold:F1}", tooltip: "Relational salience needed before a memory becomes long-term. Higher = fewer memories stick.");
+            Settings.consolidationThreshold = listingStandard.Slider(Settings.consolidationThreshold, 0.5f, 3.0f);
+
+            listingStandard.Label($"Reference Consolidation Count: {Settings.referenceThreshold}", tooltip: "How many times a memory must be surfaced/referenced before it consolidates long-term.");
+            Settings.referenceThreshold = (int)listingStandard.Slider(Settings.referenceThreshold, 1f, 10f);
+
+            listingStandard.Label($"Abandonment Risk Threshold: {Settings.abandonmentThreshold:F0}", tooltip: "AbandonmentRiskScore (0-100) above which a colonist may leave. Lower = pawns leave more readily.");
+            Settings.abandonmentThreshold = listingStandard.Slider(Settings.abandonmentThreshold, 50f, 100f);
+
+            listingStandard.Label($"Suicide Damage Multiplier: {Settings.suicideDamageMultiplier:F1}x", tooltip: "Damage multiplier applied by the suicide self-harm job.");
+            Settings.suicideDamageMultiplier = listingStandard.Slider(Settings.suicideDamageMultiplier, 1.0f, 10.0f);
+
+            listingStandard.Label($"Opinion/Trust Blend: {Settings.opinionTrustBlend:F2}", tooltip: "0 = pure vanilla opinion, 1 = pure Synapse trust. 0.5 blends them evenly.");
+            Settings.opinionTrustBlend = listingStandard.Slider(Settings.opinionTrustBlend, 0.0f, 1.0f);
+
+            listingStandard.Label($"Evaluation Cadence: every {Settings.evalCadence} day(s)", tooltip: "How often the nightly psychology evaluation runs per colonist. Higher = fewer LLM calls / lower token cost.");
+            Settings.evalCadence = (int)listingStandard.Slider(Settings.evalCadence, 1f, 7f);
+
+            Settings.ApplyToCore();
 
             listingStandard.Gap(12f);
             if (listingStandard.ButtonText("Open Encyclopedia"))

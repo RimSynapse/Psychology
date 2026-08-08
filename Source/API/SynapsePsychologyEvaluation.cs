@@ -19,6 +19,43 @@ namespace RimSynapse.Psychology.API
         /// Triggered when the pawn goes to sleep. Queues their daily events and average mood
         /// for LLM processing to update long-term context modifiers and break severity.
         /// </summary>
+        /// <summary>
+        /// Stage 0 (design §5.2): select only "today's" events — memories within the last day —
+        /// from whatever the caller passed. A window of one in-game day (60,000 ticks) matches the
+        /// filters the UI and backstory callers already applied; centralising it here means a caller
+        /// that hands over the full memory bank no longer floods the evaluator with lifetime history.
+        /// </summary>
+        public static System.Collections.Generic.List<RimSynapse.Models.WeightedMemory> SelectTodaysEvents(
+            System.Collections.Generic.List<RimSynapse.Models.WeightedMemory> events, long nowAbsTick, int windowTicks = 60000)
+        {
+            if (events == null) return new System.Collections.Generic.List<RimSynapse.Models.WeightedMemory>();
+            return events.Where(m => m != null && (nowAbsTick - m.absTick) < windowTicks).ToList();
+        }
+
+        /// <summary>
+        /// Stage 0 (design §5.1/§6): state lifetime violence against LIVING creatures explicitly so the
+        /// evaluator cannot read object-bashing as bloodlust. Mechanoid kills are deliberately excluded —
+        /// they are not living.
+        /// </summary>
+        public static string DescribeLifetimeViolence(int humanlikeKills, int animalKills)
+        {
+            int living = humanlikeKills + animalKills;
+            return $"Lifetime violence against the living: {humanlikeKills} humanlike, {animalKills} animal ({living} living kills total)";
+        }
+
+        /// <summary>Human-readable accumulated trait trajectory for the eval prompt (Stage 2).</summary>
+        public static string DescribeTraitPressures(RimSynapse.Comps.SynapseCorePawnComp coreComp)
+        {
+            if (coreComp == null || coreComp.traitPressures == null || coreComp.traitPressures.Count == 0) return "None";
+            var parts = new List<string>();
+            foreach (var kvp in coreComp.traitPressures)
+            {
+                var tp = kvp.Value;
+                parts.Add($"{kvp.Key}: {tp.pressure:0.00} toward {tp.direction ?? "?"} (peak {tp.peak:0.00})");
+            }
+            return string.Join(", ", parts);
+        }
+
         public static void QueueDailyPsychologyReview(Pawn pawn, float averageMood, System.Collections.Generic.List<RimSynapse.Models.WeightedMemory> dailyEvents, Action<bool> onComplete = null, bool isOpportunistic = false)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -46,8 +83,12 @@ You must also provide an 'AbandonmentRiskScore' (0-100) representing how likely 
 
 Finally, output a 'SocialAdjustments' object reflecting changes in their Trust (-100 to +100) and Familiarity (0 to 100) with other colonists based on recent events. Use the colonist's short name as the key. Trust offsets should be between -15 and +15. Familiarity offsets should be positive (0 to +10).
 
-Additionally, evaluate if their recent experiences are profound enough to change their personality traits. If so, return a 'TraitChanges' object with an 'Add' array (containing RimWorld trait defNames to add, e.g. 'Bloodlust', 'Nerves') and/or a 'Remove' array (trait defNames to remove). Keep this rare; leave arrays empty if no profound change occurred.
-The colonist currently has the following dynamically added traits (which you previously added): {DYNAMIC_TRAITS}. If you determine the pawn has moved past the psychological phase that caused these traits, you should include them in the 'Remove' array so they can decay.
+Additionally, assess whether recent experiences are building toward a personality change. Do NOT apply changes directly — personality shifts accumulate over MULTIPLE days and a single day rarely fires one. Instead return:
+- 'PersonalityShiftLikelihood': one of ""none"" | ""low"" | ""moderate"" | ""high"" — your overall judgement of whether ANY shift is warranted right now. If ""none"" or ""low"", today contributes no pressure toward any change.
+- 'PersonalityShiftAssessment': an array of per-candidate-trait evidence for TODAY ONLY. Each entry: { ""trait"": <RimWorld trait defName>, ""direction"": ""add"" | ""remove"", ""dailyPressure"": 0.0-1.0 (how strong TODAY's evidence is), ""rationale"": <one sentence> }. Leave the array empty if nothing is building.
+IMPORTANT — violence vs. the living: traits that reflect a taste for killing or cruelty (e.g. 'Bloodlust') require evidence of harming LIVING creatures (humanlikes or animals). Destroying inanimate objects, mining, or repeatedly attacking wrecked machinery is NOT violence against the living and must NEVER, on its own, justify adding 'Bloodlust' or removing protective/steadfast traits. If today's activity was primarily against objects, set dailyPressure near 0 and likelihood ""none""/""low"".
+IMPORTANT — trait resistance: respect the resistance values below. Protected traits must NOT be removed without overwhelming, sustained evidence.
+The colonist currently has these AI-added traits (added by you previously): {DYNAMIC_TRAITS}. Their current traits with resistance: {TRAIT_RESISTANCE}. Accumulated trait pressure so far (trajectory across days): {TRAIT_PRESSURES}.
 
 You MUST respond strictly in valid JSON format. Do not include markdown formatting or extra text.
 {
@@ -62,10 +103,10 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
   ""Addiction"": ""1-2 sentences..."",
   ""Summary"": ""1-2 sentences..."",
   ""AbandonmentRiskScore"": 0,
-  ""TraitChanges"": {
-    ""Add"": [""Bloodlust""],
-    ""Remove"": [""Kind""]
-  },
+  ""PersonalityShiftLikelihood"": ""none"",
+  ""PersonalityShiftAssessment"": [
+    { ""trait"": ""Bloodlust"", ""direction"": ""add"", ""dailyPressure"": 0.15, ""rationale"": ""Repeated combat, but only against an inert vehicle - weak signal."" }
+  ],
   ""SocialAdjustments"": {
     ""ColonistName1"": {
       ""trustOffset"": 2.5,
@@ -102,9 +143,17 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
                     "You MUST analyze the 'Tags' attached to their recent memories." + dlcInstructions);
             }
 
-            string recentEvents = dailyEvents == null || dailyEvents.Count == 0 
-                ? "No significant memories today." 
-                : string.Join("\n", dailyEvents.Select(e => $"- {e.summary} [Tags: {string.Join(", ", e.tags)}]"));
+            // Stage 0 (design §5.2): the evaluator must be able to tell today from a lifetime. Only
+            // memories from the last day count as "today"; long-standing burdens are surfaced separately
+            // below via GetTopMemoryBurdens. Filtering here fixes every caller at once — including the
+            // opportunistic profile eval, which passes the entire memory bank.
+            var todaysEvents = SelectTodaysEvents(dailyEvents, Find.TickManager.TicksAbs);
+            string recentEvents = todaysEvents.Count == 0
+                ? "No significant memories today."
+                : string.Join("\n", todaysEvents.Select(e => $"- {e.summary} [Tags: {string.Join(", ", e.tags)}]"));
+
+            // Deduped activity summary with target kinds (Core #72) — object-bashing reads as non-lethal.
+            string todaysActivity = coreComp.GetRecentJobsSummary();
 
             float threshold = RimSynapsePsychologyMod.Settings != null ? RimSynapsePsychologyMod.Settings.sensitivityThreshold : 0.5f;
             string lifetimeBurdens = coreComp.GetTopMemoryBurdens(5, threshold);
@@ -116,6 +165,8 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
             int medicine = pawn.skills?.GetSkill(SkillDefOf.Medicine)?.Level ?? 0;
             
             int lifetimeKills = pawn.records?.GetAsInt(RecordDefOf.KillsHumanlikes) ?? 0;
+            int lifetimeAnimalKills = pawn.records?.GetAsInt(RecordDefOf.KillsAnimals) ?? 0;
+            string lifetimeViolence = DescribeLifetimeViolence(lifetimeKills, lifetimeAnimalKills);
             float damageTaken = pawn.records?.GetValue(RecordDefOf.DamageTaken) ?? 0f;
             float timeAsColonist = (pawn.records?.GetValue(RecordDefOf.TimeAsColonistOrColonyAnimal) ?? 0f) / 60000f; // in days
 
@@ -162,17 +213,23 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
             }
             systemPrompt = systemPrompt.Replace("{DYNAMIC_TRAITS}", dynamicTraitsStr);
 
+            // Stage 2: feed the trait-resistance dimension and the accumulated cross-day trajectory.
+            systemPrompt = systemPrompt.Replace("{TRAIT_RESISTANCE}", SynapseTraitPolicy.DescribeResistanceForPrompt(pawn));
+            systemPrompt = systemPrompt.Replace("{TRAIT_PRESSURES}", DescribeTraitPressures(coreComp));
+
             string userMessage = $@"Patient Name: {pawn.Name.ToStringShort}
 Gender: {pawn.gender}
 Status: {statusText}
 Colony Size: {colonySize}
 Time as Colonist: {timeAsColonist:F1} days
-Survival Stats: Melee {melee}, Shooting {shooting}, Medicine {medicine}, Lifetime Human Kills: {lifetimeKills}, Damage Taken: {damageTaken:F0}
+Survival Stats: Melee {melee}, Shooting {shooting}, Medicine {medicine}, Damage Taken: {damageTaken:F0}
+{lifetimeViolence}
 Average Mood Today: {averageMood:F2}{suppression}
-Psychological Burdens (Sensitivity): {lifetimeBurdens}
+Long-standing psychological burdens (weighted): {lifetimeBurdens}
 Current Social Network (Trust, Familiarity, Affinity):
 {socialNetworkStr}
-Recent Memories:
+Today's Activity (deduped, with target kinds): {todaysActivity}
+Today's Events:
 {recentEvents}";
 
             var options = new ChatOptions { priority = isOpportunistic ? -1 : 0, requestName = "Daily Psychology Review", targetName = pawn.Name.ToStringShort };
