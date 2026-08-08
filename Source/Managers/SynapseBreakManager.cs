@@ -53,10 +53,10 @@ namespace RimSynapse.Psychology.Managers
                 {
                     // Mark as pending to prevent spamming the LLM
                     comp.currentBreakWarning = "pending";
-                    
-                    // Request LLM Break Profile
-                    // (This will eventually hook into Core to queue an actual LLM contextual request)
-                    // SynapsePsychology.RequestBreakWarning(pawn);
+
+                    // Request an LLM break profile; on success it calls PredictMentalBreak, which sets
+                    // predictedBreakState so the branch below can fire the AI-driven break (#50).
+                    RimSynapse.Psychology.API.SynapsePsychology.RequestBreakWarning(pawn);
                 }
                 else if (comp.predictedBreakState != null)
                 {

@@ -213,11 +213,24 @@ Transcript:
                 RimSynapsePsychologyMod.ModHandle,
                 systemPrompt,
                 userMessage,
-                result => 
+                result =>
                 {
                     if (result.success)
                     {
                         string summary = result.content.Trim();
+                        if (!string.IsNullOrEmpty(summary))
+                        {
+                            // Persist on the main thread: a durable long-term memory on BOTH pawns,
+                            // linked to the other by id, so it feeds future interactions and shows in
+                            // the long-term memory tier (#51 — it used to be computed then discarded).
+                            SynapseGameComponent.Enqueue(() =>
+                            {
+                                long now = Find.TickManager?.TicksAbs ?? 0L;
+                                SynapsePsychology.AddMemory(initiator, BuildTherapyMemory(target, summary, now));
+                                SynapsePsychology.AddMemory(target, BuildTherapyMemory(initiator, summary, now));
+                                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse-Psychology] Stored therapy summary for {initiator.Name?.ToStringShort} & {target.Name?.ToStringShort}.");
+                            });
+                        }
                     }
                     else
                     {
@@ -226,6 +239,25 @@ Transcript:
                 },
                 options
             );
+        }
+
+        /// <summary>
+        /// Build the durable therapy-summary memory an owner keeps about the other participant.
+        /// Long-term (never decays) and linked by the other's id so relational queries find it.
+        /// </summary>
+        public static WeightedMemory BuildTherapyMemory(Pawn other, string summary, long nowTick)
+        {
+            return new WeightedMemory
+            {
+                summary = $"Therapy session with {other?.Name?.ToStringShort ?? "someone"}: {summary}",
+                weight = 0.8f,
+                baseWeight = 0.8f,
+                isLongTerm = true,
+                tags = new List<string> { "Therapy", "Counseling" },
+                subjectPawnIds = other != null ? new List<string> { other.GetUniqueLoadID() } : new List<string>(),
+                memoryType = "Therapy",
+                absTick = nowTick
+            };
         }
     }
 }
