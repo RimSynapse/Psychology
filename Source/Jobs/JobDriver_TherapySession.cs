@@ -198,11 +198,11 @@ namespace RimSynapse.Psychology.Jobs
                         if (coreComp != null)
                         {
                             long currentTick = Find.TickManager?.TicksAbs ?? 0;
-                            coreComp.memories.Add(new RimSynapse.Models.WeightedMemory
+                            coreComp.AddMemory(new RimSynapse.Models.WeightedMemory
                             {
                                 summary = $"Cured of {curedTrait.Label} through successful therapy.",
-                                weight = 10f,
-                                baseWeight = 10f,
+                                weight = 1.0f,
+                                baseWeight = 1.0f,
                                 decayRate = 0f,
                                 isLongTerm = true, // Timeline memories never decay
                                 tags = new List<string> { "TraitShift", "Therapy", "Recovery" },

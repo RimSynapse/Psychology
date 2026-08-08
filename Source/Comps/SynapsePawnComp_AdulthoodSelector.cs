@@ -170,11 +170,11 @@ Select the best-fitting adulthood backstory by number.";
                         tags = arr.Select(t => t.ToString()).ToList();
 
                     long nowTick = SynapseDateHelper.GetCurrentAbsTick();
-                    coreComp.memories.Add(new WeightedMemory
+                    coreComp.AddMemory(new WeightedMemory
                     {
                         summary = memoryText,
-                        weight = 3.0f,
-                        baseWeight = 3.0f,
+                        weight = 0.8f,
+                        baseWeight = 0.8f,
                         decayRate = 0f,
                         tags = tags,
                         memoryType = "BackstoryAdulthood",
