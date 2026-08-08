@@ -1,5 +1,5 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
-[b]Version:[/b] v0.7.0 (Target: RimWorld 1.6)
+[b]Version:[/b] v0.7.1 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Psychology[/h1]
 [b][url=https://github.com/RimSynapse/Psychology/wiki]Official Wiki and Documentation[/url][/b]
@@ -32,6 +32,17 @@ Breathe genuine psychological depth into your colonists. RimSynapse Psychology r
 These ship when they are ready - no dates.
 
 ---
+
+[h2]Changelog (v0.7.1) - Gradual personality and smarter memory[/h2]
+[list]
+[*] Fixed the headline bug: a colonist could gain Bloodlust and lose a steadfast trait just from repeatedly attacking an object (like a wrecked vehicle). Violence against inert objects is now clearly distinguished from harming the living and can no longer drive bloodthirsty personality changes.
+[*] NEW - Gradual, multi-day personality shifts: traits no longer flip in a single day. Evidence builds as "pressure" over several days, is resisted by steadfast traits (which also protect themselves from removal), and only fires once sustained - and an evaluation that calls a shift "unlikely" can no longer flip a trait at all.
+[*] NEW - Trait-change guardrails: only sanctioned traits can be added or removed (never, for example, Psychopath), at most one change per evaluation, with a cooldown between changes.
+[*] NEW - Mod settings sliders: trait-shift threshold and pressure decay, memory consolidation, abandonment risk, suicide damage, opinion/trust blend, and an evaluation cadence to cut LLM token cost.
+[*] Fixed: AI-driven mental breaks now actually fire (the request was previously left inert).
+[*] Fixed: therapy-session summaries are now kept as durable memories on both colonists instead of being discarded.
+[*] The daily evaluation now separates today from a lifetime of history, and the memory panel splits short vs long-term by real importance.
+[/list]
 
 [h2]Changelog (v0.7.0) - Regions and Territories Compatibility[/h2]
 [list]

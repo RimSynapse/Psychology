@@ -2,6 +2,16 @@
 
 Full version history for RimSynapse - Psychology. The mod page and Workshop description show only the latest release; every earlier version is recorded here.
 
+## v0.7.1 - Gradual personality and smarter memory
+- Fixed the headline bug: a colonist could gain Bloodlust and lose a steadfast trait just from repeatedly attacking an object (like a wrecked vehicle). Violence against inert objects is now clearly distinguished from harming the living and can no longer drive bloodthirsty personality changes.
+- NEW - Gradual, multi-day personality shifts: traits no longer flip in a single day. Evidence builds as "pressure" over several days, is resisted by steadfast traits (which also protect themselves from removal), and only fires once sustained - and an evaluation that calls a shift "unlikely" can no longer flip a trait at all.
+- NEW - Trait-change guardrails: only sanctioned traits can be added or removed (never, for example, Psychopath), at most one change per evaluation, with a cooldown between changes. Social trust/familiarity offsets are clamped to their per-eval range before applying.
+- NEW - Mod settings sliders: trait-shift threshold and pressure decay, memory consolidation and reference thresholds, abandonment risk, suicide damage, opinion/trust blend, and an evaluation cadence (every N days) to cut LLM token cost.
+- Fixed: AI-driven mental breaks now actually fire (the break-prediction request was previously commented out and left inert).
+- Fixed: therapy-session summaries are now kept as durable long-term memories on both colonists instead of being computed and discarded.
+- The daily evaluation now separates today's events from a lifetime of history and states lifetime violence against the living explicitly; the memory panel splits short vs long-term by real importance rather than a memory-type list.
+- Requires Core v0.7.1; saves and settings carry over unchanged.
+
 ## v0.7.0 - Regions and Territories Compatibility
 - Moves in step with RimSynapse Core v0.7.0.
 - Requires Core v0.7.0; saves and settings carry over unchanged.
