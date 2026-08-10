@@ -66,27 +66,9 @@ namespace RimSynapse.Psychology.API
             if (threshold <= 0f) threshold = 1f;
             var sb = new System.Text.StringBuilder();
             // Stable character anchor — so "out of character" is judged against a FIXED identity, not
-            // re-derived (and flipped) each night. This is what keeps verdicts consistent across reviews.
-            // Prefer the settled personality summary; fall back to the pawn's traits (always present).
-            string anchor = coreComp?.personalitySummary;
-            if (string.IsNullOrWhiteSpace(anchor))
-            {
-                var traits = pawn.story?.traits?.allTraits;
-                if (traits != null && traits.Count > 0)
-                {
-                    // Base identity only — exclude what the engine has been ADDING (dynamic + Synapse_*
-                    // aversion/strike/incapable traits), or we'd anchor "settled character" on the very
-                    // transient thing under question (circular).
-                    var pc = pawn.TryGetComp<SynapsePawnComp>();
-                    var dyn = pc?.dynamicTraits != null
-                        ? new System.Collections.Generic.HashSet<TraitDef>(pc.dynamicTraits.Select(d => d.traitDef))
-                        : new System.Collections.Generic.HashSet<TraitDef>();
-                    var baseLabels = traits
-                        .Where(t => t.def != null && !t.def.defName.StartsWith("Synapse_") && !dyn.Contains(t.def))
-                        .Select(t => t.Label).ToList();
-                    if (baseLabels.Count > 0) anchor = string.Join(", ", baseLabels);
-                }
-            }
+            // re-derived (and flipped) each night. Core supplies the LLM summary if present, else a
+            // deterministic backstory+traits baseline (transient Synapse_ traits already excluded there).
+            string anchor = coreComp?.EffectivePersonalitySummary();
             if (!string.IsNullOrWhiteSpace(anchor))
                 sb.AppendLine($"Who this colonist fundamentally is (their settled character — judge against THIS): {anchor}");
             string style = SynapseTraitEngine.Confronts(pawn)

@@ -224,6 +224,15 @@ namespace RimSynapse.Psychology.Utils
             RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Force resolve for {p.LabelShort}: {r}");
         }
 
+        [DebugAction("RimSynapse", "Skill Engine: Dump personality (LLM + Core baseline)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void DumpPersonality(Pawn p)
+        {
+            var core = p?.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) return;
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Personality for {p.LabelShort} ---\n[LLM summary] {(string.IsNullOrEmpty(core.personalitySummary) ? "(none)" : core.personalitySummary)}\n[Core baseline (no-Psychology fallback)] {core.ComputeBaselinePersonality() ?? "(none)"}\n[Effective] {core.EffectivePersonalitySummary() ?? "(none)"}");
+        }
+
         [DebugAction("RimSynapse", "Skill Engine: Dump candidate prompt (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpCandidatePrompt(Pawn p)
         {
