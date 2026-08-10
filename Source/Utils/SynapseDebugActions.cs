@@ -40,6 +40,32 @@ namespace RimSynapse.Psychology.Utils
             }
         }
 
+        [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void DumpVoice(Pawn p)
+        {
+            if (p == null) return;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.Name} has no SynapseCorePawnComp."); return; }
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Voice for {p.LabelShort} ({p.gender}) --- kokoroVoice={core.kokoroVoice ?? "(none)"} speed={core.kokoroSpeed:F2} " +
+                $"blend={(string.IsNullOrEmpty(core.kokoroBlendVoice) ? "none" : core.kokoroBlendVoice + "@" + core.kokoroBlendWeight.ToString("F2"))} " +
+                $"generated={core.voiceGenerated}");
+            RimSynapse.SynapseLogger.Info("psychology", $"  style: {core.voiceProfile ?? "(none)"}");
+        }
+
+        [DebugAction("RimSynapse", "Psychology: (Re)generate voice (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void RegenerateVoice(Pawn p)
+        {
+            if (p == null) return;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            var psych = p.TryGetComp<SynapsePawnComp>();
+            if (core == null || psych == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.Name} missing comps for voice."); return; }
+            core.voiceGenerated = false;      // allow re-derive
+            core.kokoroVoice = null;          // reroll base voice too
+            psych.DeriveVoiceProfile(p, core);
+            RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Requested voice (re)generation for {p.LabelShort}.");
+        }
+
         [DebugAction("RimSynapse", "Psychology: Add Random Memory", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void AddRandomMemory(Pawn p)
         {

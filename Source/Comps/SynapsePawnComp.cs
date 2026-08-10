@@ -152,6 +152,17 @@ namespace RimSynapse.Psychology.Comps
                     CheckAdulthoodBackstoryNeeded(pawn);
                 }
 
+                // Voice backfill (#33): a pawn with a personality but no voice yet (e.g. a save predating
+                // voices) gets one derived once. New pawns get their voice with the profile itself.
+                if (hasBackstoryMemory && !isGeneratingVoice)
+                {
+                    var core = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
+                    if (core != null && !core.voiceGenerated && !string.IsNullOrEmpty(core.personalitySummary))
+                    {
+                        DeriveVoiceProfile(pawn, core);
+                    }
+                }
+
                 // Sleep Tracking & Daily Review (TickRare is 250 ticks)
                 if (pawn.needs != null && pawn.needs.mood != null)
                 {
