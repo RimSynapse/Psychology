@@ -166,6 +166,31 @@ namespace RimSynapse.Psychology.Utils
             RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Troubled {p.LabelShort}: 6 cuts + grief memory. Mood now {(p.needs?.mood?.CurLevelPercentage ?? 0f):P0}.");
         }
 
+        private static readonly string[] BleakDayLines =
+        {
+            "Another pointless day; nothing they build ever lasts, and they said so to anyone who'd listen.",
+            "They watched supplies rot and muttered the colony is doomed no matter what anyone does.",
+            "A fresh grave, worse weather, more loss — they've stopped expecting anything to ever go right.",
+            "They snapped that hope is a lie people tell themselves; everything decays, everyone leaves.",
+            "They stared at the wall for hours, certain the next raid will be the one that finishes them all.",
+        };
+
+        /// <summary>Testing aid: apply one day of bleak, hopeless experience (a despair-tagged memory, no
+        /// injuries) — repeat across several forced reviews to build sustained pressure toward Pessimist.</summary>
+        [DebugAction("RimSynapse", "Psychology: Apply bleak day (pessimism evidence)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ApplyBleakDay(Pawn p)
+        {
+            if (p == null) return;
+            SynapsePsychology.AddMemory(p, new WeightedMemory
+            {
+                summary = BleakDayLines[Rand.Range(0, BleakDayLines.Length)],
+                weight = 0.85f, baseWeight = 0.85f, memoryType = "EventReflection",
+                tags = new System.Collections.Generic.List<string> { "Despair", "Hopelessness", "Grief", "Pessimism" },
+                absTick = Find.TickManager.TicksAbs, isLongTerm = false
+            });
+            RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Applied a bleak day to {p.LabelShort} (despair memory).");
+        }
+
         [DebugAction("RimSynapse", "Psychology: Force Break Sweep (all colonists)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void ForceBreakSweep()
         {
