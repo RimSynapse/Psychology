@@ -71,8 +71,10 @@ namespace RimSynapse.Psychology.UI
             var pawnComp = pawn.TryGetComp<SynapsePawnComp>();
             if (pawnComp == null || pawnComp.medicalProfile == null) return;
 
-            string[] formFields = { "Mood", "Interpersonal", "Trauma", "Cognitive", "Motivations", "Identity", "Morality", "Authority", "Addiction", "Summary" };
-            string[] formLabels = { "Emotional Baseline", "Interpersonal Dynamics", "Trauma Profile", "Cognitive Patterns", "Motivations", "Identity", "Moral Compass", "Authority Response", "Addiction Profile", "Clinical Summary" };
+            // Five-section evaluation (down from nine) so it fits one screen. State & Trajectory are the
+            // player warnings (badged below); Temperament/Bonds/Drives are context for speech & interactions.
+            string[] formFields = { "State", "Trajectory", "Temperament", "Bonds", "Drives" };
+            string[] formLabels = { "State & Break Risk", "Trait Trajectory", "Temperament", "Bonds", "Drives & Lines" };
 
             // Calculate scroll height
             float totalFormHeight = 0f;
@@ -82,6 +84,7 @@ namespace RimSynapse.Psychology.UI
                 totalFormHeight += 22f + Text.CalcHeight(val, rect.width - 30f) + 20f;
             }
             totalFormHeight += 50f; // Extra for personality summary
+            totalFormHeight += 70f; // Headline + warning badges (#psych-eval rework)
             
             // Calculate Patient History height
             var historyMemories = coreComp.memories.Where(m => m.tags != null && m.tags.Contains("TraitShift")).OrderBy(m => m.absTick).ToList();
@@ -107,6 +110,37 @@ namespace RimSynapse.Psychology.UI
             Widgets.BeginScrollView(scrollRect, ref profileScrollPosition, viewRect);
 
             float formY = 0f;
+
+            // Headline — the at-a-glance read.
+            if (pawnComp.medicalProfile.TryGetValue("Headline", out string headline) && !string.IsNullOrEmpty(headline))
+            {
+                var oldF = Text.Font; Text.Font = GameFont.Small;
+                float hH = Text.CalcHeight("<b>" + headline + "</b>", viewRect.width);
+                Widgets.Label(new Rect(0f, formY, viewRect.width, hH), "<b>" + headline + "</b>");
+                Text.Font = oldF;
+                formY += hH + 8f;
+            }
+
+            // Two warning badges: mood/break risk (live) and trait-shift likelihood (from the eval).
+            float moodPct = pawn.needs?.mood?.CurLevelPercentage ?? 1f;
+            var breaker = pawn.mindState?.mentalBreaker;
+            float thrMajor = breaker != null ? breaker.BreakThresholdMajor : 0.15f;
+            float thrMinor = breaker != null ? breaker.BreakThresholdMinor : 0.35f;
+            string moodTxt; Color moodCol;
+            if (moodPct <= thrMajor) { moodTxt = "CRITICAL"; moodCol = new Color(0.80f, 0.20f, 0.20f); }
+            else if (moodPct <= thrMinor) { moodTxt = "AT RISK"; moodCol = new Color(0.82f, 0.60f, 0.15f); }
+            else { moodTxt = "STABLE"; moodCol = new Color(0.28f, 0.62f, 0.36f); }
+
+            string like = pawnComp.medicalProfile.TryGetValue("PersonalityShiftLikelihood", out string lk) ? (lk ?? "none").ToLowerInvariant() : "none";
+            string shiftTxt; Color shiftCol;
+            if (like == "high") { shiftTxt = "IMMINENT"; shiftCol = new Color(0.80f, 0.20f, 0.20f); }
+            else if (like == "moderate") { shiftTxt = "SHIFTING"; shiftCol = new Color(0.82f, 0.60f, 0.15f); }
+            else { shiftTxt = "STABLE"; shiftCol = new Color(0.28f, 0.62f, 0.36f); }
+
+            float badgeW = Mathf.Min(210f, (viewRect.width - 10f) / 2f);
+            DrawEvalBadge(new Rect(0f, formY, badgeW, 24f), "Mood", $"{moodTxt} ({moodPct.ToStringPercent()})", moodCol);
+            DrawEvalBadge(new Rect(badgeW + 10f, formY, badgeW, 24f), "Trait shift", shiftTxt, shiftCol);
+            formY += 34f;
 
             // Personality Summary
             if (!string.IsNullOrEmpty(coreComp.personalitySummary))
@@ -179,6 +213,18 @@ namespace RimSynapse.Psychology.UI
             Widgets.DrawLineHorizontal(rect.x, formY, viewRect.width);
             
             Widgets.EndScrollView();
+        }
+
+        private static void DrawEvalBadge(Rect r, string label, string value, Color color)
+        {
+            var oldA = Text.Anchor; var oldF = Text.Font; var oldC = GUI.color;
+            Widgets.DrawBoxSolid(r, new Color(color.r, color.g, color.b, 0.20f));
+            GUI.color = new Color(color.r, color.g, color.b, 0.9f);
+            Widgets.DrawBox(r);
+            Text.Font = GameFont.Tiny;
+            Text.Anchor = TextAnchor.MiddleCenter;
+            Widgets.Label(r, $"{label}: {value}");
+            Text.Anchor = oldA; Text.Font = oldF; GUI.color = oldC;
         }
 
         private void DrawMemoriesTab(Rect rect)

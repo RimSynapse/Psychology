@@ -35,6 +35,10 @@ namespace RimSynapse.Psychology.API
                         string shiftLikelihood = parsed.TryGetValue("PersonalityShiftLikelihood", out var likeObj)
                             ? likeObj?.ToString() : null;
 
+                        // Each evaluation is a fresh snapshot — clear prior keys so retired categories
+                        // (the old 9-section schema) don't linger in medicalProfile alongside the new 5.
+                        pawnComp.medicalProfile?.Clear();
+
                         foreach (var kvp in parsed)
                         {
                             if (kvp.Key == "SocialAdjustments" && kvp.Value is Newtonsoft.Json.Linq.JObject socialObj)

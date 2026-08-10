@@ -37,6 +37,12 @@ namespace RimSynapse.Psychology.Utils
                 RimSynapse.SynapseLogger.Info("psychology", $"Break Category: {psychComp.breakCategory}");
                 RimSynapse.SynapseLogger.Info("psychology", $"Zealot: {psychComp.ideologyZealot}");
                 RimSynapse.SynapseLogger.Info("psychology", $"Has Backstory Memory: {psychComp.hasBackstoryMemory}");
+                if (psychComp.medicalProfile != null && psychComp.medicalProfile.Count > 0)
+                {
+                    RimSynapse.SynapseLogger.Info("psychology", "--- Clinical evaluation (medicalProfile) ---");
+                    foreach (var kv in psychComp.medicalProfile)
+                        RimSynapse.SynapseLogger.Info("psychology", $"  [{kv.Key}] {kv.Value}");
+                }
             }
         }
 

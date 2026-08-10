@@ -79,18 +79,14 @@ namespace RimSynapse.Psychology.API
             var coreComp = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
             if (pawnComp == null || coreComp == null) return;
 
-            string systemPrompt = @"You are a clinical psychologist in the RimWorld universe writing a formal medical evaluation.
-Based on this colonist's average mood today, their recent memories, their survival skills, and the state of the colony, assess the following 9 categories (write 1-2 sentences each), and then provide a final Summary:
-- Mood (Emotional baseline, volatility, and general disposition)
-- Interpersonal (Attachment style, sociability, relationships with others)
-- Trauma (Lingering psychological effects of past horrors, deaths, or recent brutal raids)
-- Cognitive (Paranoia, grandiosity, irrational fears, or hyper-fixations)
-- Motivations (What keeps them going: duty, survival, greed, ideology?)
-- Identity (How they view themselves and their role within the colony)
-- Morality (Capacity for cruelty versus compassion: e.g., handling prisoners, organ harvesting)
-- Authority (Rebelliousness versus obedience to colony leadership and drafted orders)
-- Addiction (Psychological reliance on substances or specific comforts)
-- Summary (The final overarching clinical assessment and prognosis)
+            string systemPrompt = @"You are a clinical psychologist in the RimWorld universe writing a brief, practical assessment for the colony overseer. It must fit on one screen, so be economical.
+Cover a one-line Headline plus these FIVE sections. Write as much or as little as each warrants for THIS colonist TODAY — a stable colonist may need a single clause; a colonist in crisis or mid-trait-shift may need a few sentences. Do NOT pad a quiet section, and do NOT truncate a serious one.
+- Headline: one line — the single thing the overseer most needs to know right now. A mood danger or a brewing trait shift takes priority over anything else.
+- State: current mood, volatility, and how close they are to a mental break; name the biggest thing dragging them down or holding them up.
+- Trajectory: whether their personality is shifting — which trait is forming or fading and how close it is — or simply 'stable' if nothing is building.
+- Temperament: who they are and how they carry themselves — the disposition that colours how they speak and act (useful for voicing them).
+- Bonds: their attachments and frictions — who they lean on, who they clash with.
+- Drives: what keeps them going, and the lines they will not cross.
 
 You MUST analyze the 'Tags' attached to their recent memories. If you see recurring themes (e.g. 'Food', 'Starving', 'Safety'), you must explicitly address this growing concern in your evaluation.
 
@@ -107,16 +103,12 @@ The colonist currently has these AI-added traits (added by you previously): {DYN
 
 You MUST respond strictly in valid JSON format. Do not include markdown formatting or extra text.
 {
-  ""Mood"": ""1-2 sentences..."",
-  ""Interpersonal"": ""1-2 sentences..."",
-  ""Trauma"": ""1-2 sentences..."",
-  ""Cognitive"": ""1-2 sentences..."",
-  ""Motivations"": ""1-2 sentences..."",
-  ""Identity"": ""1-2 sentences..."",
-  ""Morality"": ""1-2 sentences..."",
-  ""Authority"": ""1-2 sentences..."",
-  ""Addiction"": ""1-2 sentences..."",
-  ""Summary"": ""1-2 sentences..."",
+  ""Headline"": ""one line — the most important thing right now"",
+  ""State"": ""mood, volatility, break proximity, and the main driver — length to match"",
+  ""Trajectory"": ""trait forming/fading and how close, or 'stable'"",
+  ""Temperament"": ""disposition and manner"",
+  ""Bonds"": ""attachments and frictions"",
+  ""Drives"": ""motivations and hard lines"",
   ""AbandonmentRiskScore"": 0,
   ""PersonalityShiftLikelihood"": ""none"",
   ""PersonalityShiftAssessment"": [
