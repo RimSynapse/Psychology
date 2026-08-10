@@ -56,9 +56,24 @@ namespace RimSynapse.Psychology.API
             return string.Join(", ", parts);
         }
 
+        /// <summary>
+        /// Who the psychology system spends LLM calls on (#39): people the colony has a relationship with —
+        /// colonists, prisoners and slaves of the colony, and quest lodgers who actually stay. NOT enemy
+        /// pawns or passing traders/visitors. Cheap enough to run per-humanlike in TickRare.
+        /// </summary>
+        public static bool IsEligibleForReview(Pawn pawn)
+        {
+            if (pawn == null || !pawn.RaceProps.Humanlike || pawn.Dead) return false;
+            return pawn.IsColonist || pawn.IsPrisonerOfColony || pawn.IsSlaveOfColony || pawn.IsQuestLodger();
+        }
+
         public static void QueueDailyPsychologyReview(Pawn pawn, float averageMood, System.Collections.Generic.List<RimSynapse.Models.WeightedMemory> dailyEvents, Action<bool> onComplete = null, bool isOpportunistic = false)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            // Chokepoint: never spend a clinical-review request on someone the colony has no relationship
+            // with (a raider, a passing trader). Covers every caller (nightly, opportunistic, debug).
+            if (!IsEligibleForReview(pawn)) { onComplete?.Invoke(false); return; }
 
             var pawnComp = pawn.TryGetComp<SynapsePawnComp>();
             var coreComp = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
@@ -170,7 +185,12 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
             float damageTaken = pawn.records?.GetValue(RecordDefOf.DamageTaken) ?? 0f;
             float timeAsColonist = (pawn.records?.GetValue(RecordDefOf.TimeAsColonistOrColonyAnimal) ?? 0f) / 60000f; // in days
 
-            string statusText = pawn.IsColonist ? "Colonist" : (pawn.IsPrisoner ? "Prisoner" : (pawn.IsSlave ? "Slave" : "Guest"));
+            // Explicit classification — "Guest" is reached by an actual lodger check, never as a
+            // catch-all for "everything else" (#39). Ineligible pawns are gated out before this point.
+            string statusText = pawn.IsColonist ? "Colonist"
+                : (pawn.IsPrisoner ? "Prisoner"
+                : (pawn.IsSlave ? "Slave"
+                : (pawn.IsQuestLodger() ? "Guest" : "Colony affiliate")));
             NeedDef suppressionDef = DefDatabase<NeedDef>.GetNamedSilentFail("Suppression");
             string suppression = (pawn.IsSlave && suppressionDef != null) ? $"\nSuppression: {pawn.needs?.TryGetNeed(suppressionDef)?.CurLevelPercentage:P0}" : "";
 

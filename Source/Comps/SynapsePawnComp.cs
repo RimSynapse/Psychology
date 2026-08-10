@@ -163,8 +163,10 @@ namespace RimSynapse.Psychology.Comps
                     }
                 }
 
-                // Sleep Tracking & Daily Review (TickRare is 250 ticks)
-                if (pawn.needs != null && pawn.needs.mood != null)
+                // Sleep Tracking & Daily Review (TickRare is 250 ticks). Only for pawns the colony has a
+                // relationship with (#39) — raiders and passing traders are gated out cheaply here.
+                if (pawn.needs != null && pawn.needs.mood != null
+                    && RimSynapse.Psychology.API.SynapsePsychology.IsEligibleForReview(pawn))
                 {
                     dailyMoodAccumulator += pawn.needs.mood.CurLevelPercentage;
                     moodSamples++;
