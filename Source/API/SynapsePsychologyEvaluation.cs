@@ -65,6 +65,30 @@ namespace RimSynapse.Psychology.API
             float threshold = RimSynapsePsychologyMod.Settings?.shiftThreshold ?? 1.0f;
             if (threshold <= 0f) threshold = 1f;
             var sb = new System.Text.StringBuilder();
+            // Stable character anchor — so "out of character" is judged against a FIXED identity, not
+            // re-derived (and flipped) each night. This is what keeps verdicts consistent across reviews.
+            // Prefer the settled personality summary; fall back to the pawn's traits (always present).
+            string anchor = coreComp?.personalitySummary;
+            if (string.IsNullOrWhiteSpace(anchor))
+            {
+                var traits = pawn.story?.traits?.allTraits;
+                if (traits != null && traits.Count > 0)
+                {
+                    // Base identity only — exclude what the engine has been ADDING (dynamic + Synapse_*
+                    // aversion/strike/incapable traits), or we'd anchor "settled character" on the very
+                    // transient thing under question (circular).
+                    var pc = pawn.TryGetComp<SynapsePawnComp>();
+                    var dyn = pc?.dynamicTraits != null
+                        ? new System.Collections.Generic.HashSet<TraitDef>(pc.dynamicTraits.Select(d => d.traitDef))
+                        : new System.Collections.Generic.HashSet<TraitDef>();
+                    var baseLabels = traits
+                        .Where(t => t.def != null && !t.def.defName.StartsWith("Synapse_") && !dyn.Contains(t.def))
+                        .Select(t => t.Label).ToList();
+                    if (baseLabels.Count > 0) anchor = string.Join(", ", baseLabels);
+                }
+            }
+            if (!string.IsNullOrWhiteSpace(anchor))
+                sb.AppendLine($"Who this colonist fundamentally is (their settled character — judge against THIS): {anchor}");
             string style = SynapseTraitEngine.Confronts(pawn)
                 ? "faces problems head-on (under strain, refuses drudge work to protect what matters most)"
                 : "avoids problems (under strain, withdraws from the hardest work)";
@@ -75,12 +99,17 @@ namespace RimSynapse.Psychology.API
                 sb.Append("Building changes: none right now.");
                 return sb.ToString();
             }
-            sb.AppendLine("Building changes (id — meaning — closeness):");
+            sb.AppendLine("Building changes (id — meaning — closeness — your prior read, if any):");
+            var pcomp = pawn.TryGetComp<SynapsePawnComp>();
             foreach (var kvp in coreComp.traitPressures.OrderByDescending(k => k.Value.pressure).Take(6))
             {
                 if (kvp.Value.pressure < 0.15f) continue;
                 int pct = (int)System.Math.Min(100f, kvp.Value.pressure / threshold * 100f);
-                sb.AppendLine($"- \"{kvp.Key}\" — {DescribeCandidate(pawn, kvp.Key)} — {pct}% of the way there");
+                string prior = "";
+                if (pcomp?.traitJudgments != null && pcomp.traitJudgments.TryGetValue(kvp.Key, out var pj)
+                    && !string.IsNullOrEmpty(pj.verdict))
+                    prior = $" — your prior read: {pj.verdict}";
+                sb.AppendLine($"- \"{kvp.Key}\" — {DescribeCandidate(pawn, kvp.Key)} — {pct}% of the way there{prior}");
             }
             return sb.ToString().TrimEnd();
         }
@@ -149,7 +178,7 @@ The engine already measures which personality changes are building for this colo
 {TRAIT_CANDIDATES}
 Return:
 - 'PersonalityShiftLikelihood': ""none"" | ""low"" | ""moderate"" | ""high"" — your read of whether ANY of these changes is genuinely warranted right now.
-- 'TraitJudgment': an array, one entry per candidate above you have a view on. Each: { ""candidateId"": <copy an id EXACTLY from the list>, ""verdict"": ""in_character"" | ""out_of_character"" | ""uncertain"", ""flavor"": <one vivid, in-character sentence describing this change as if it just happened> }. The flavor is the EXACT text the overseer reads when the change lands, so ALWAYS write one for any candidate at 60% or more. Use ""out_of_character"" ONLY when the change would betray who this colonist truly is despite the behaviour — that pushes back against it. Empty array only if nothing is building.
+- 'TraitJudgment': an array, one entry per candidate above you have a view on. Each: { ""candidateId"": <copy an id EXACTLY from the list>, ""verdict"": ""in_character"" | ""out_of_character"" | ""uncertain"", ""flavor"": <one vivid, in-character sentence describing this change as if it just happened> }. The flavor is the EXACT text the overseer reads when the change lands, so ALWAYS write one for any candidate at 60% or more. Judge ""in_character"" vs ""out_of_character"" against their SETTLED CHARACTER above, not your mood today. Use ""out_of_character"" ONLY when the change would betray who this colonist truly is despite the behaviour — that pushes back against it. CONSISTENCY: where a candidate shows ""your prior read"", keep that same verdict unless the situation has genuinely changed — do NOT flip a verdict from one night to the next without a real reason. Empty array only if nothing is building.
 IMPORTANT — violence vs. the living: traits that reflect a taste for killing or cruelty (e.g. 'Bloodlust') require evidence of harming LIVING creatures (humanlikes or animals). Destroying inanimate objects, mining, or repeatedly attacking wrecked machinery is NOT violence against the living and must NEVER, on its own, justify adding 'Bloodlust' or removing protective/steadfast traits. If today's activity was primarily against objects, set dailyPressure near 0 and likelihood ""none""/""low"".
 IMPORTANT — trait resistance: respect the resistance values below. Protected traits must NOT be removed without overwhelming, sustained evidence.
 The colonist currently has these AI-added traits (added by you previously): {DYNAMIC_TRAITS}. Their current traits with resistance: {TRAIT_RESISTANCE}. Accumulated trait pressure so far (trajectory across days): {TRAIT_PRESSURES}.
