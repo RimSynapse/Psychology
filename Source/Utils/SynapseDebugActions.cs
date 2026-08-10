@@ -224,6 +224,15 @@ namespace RimSynapse.Psychology.Utils
             RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Force resolve for {p.LabelShort}: {r}");
         }
 
+        [DebugAction("RimSynapse", "Skill Engine: Dump candidate prompt (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void DumpCandidatePrompt(Pawn p)
+        {
+            var core = p?.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) return;
+            string block = RimSynapse.Psychology.API.SynapsePsychology.DescribeTraitCandidatesForPrompt(p, core);
+            RimSynapse.SynapseLogger.Info("psychology", $"--- {{TRAIT_CANDIDATES}} the model receives for {p.LabelShort} ---\n{block}");
+        }
+
         [DebugAction("RimSynapse", "Skill Engine: Dump judgments (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpJudgments(Pawn p)
         {

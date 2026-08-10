@@ -314,13 +314,20 @@ namespace RimSynapse.Psychology.API
             return d > 1f ? 1f : (d < -1f ? -1f : d);
         }
 
-        /// <summary>The LLM's pre-staged flavour for a candidate (Phase 2), or the templated fallback.</summary>
+        /// <summary>
+        /// The LLM's narration for a fired change: the per-candidate flavour if it wrote one, else the
+        /// review's Headline (weak models reliably fill the narrative sections but often leave the
+        /// TraitJudgment.flavor field empty — LCD fallback), else the templated line.
+        /// </summary>
         private static string LlmReason(Pawn pawn, string candidateId, string fallback)
         {
             var comp = pawn.TryGetComp<SynapsePawnComp>();
             if (comp?.traitJudgments != null && comp.traitJudgments.TryGetValue(candidateId, out var j)
                 && !string.IsNullOrWhiteSpace(j.flavor))
                 return j.flavor;
+            if (comp?.medicalProfile != null && comp.medicalProfile.TryGetValue("Headline", out var headline)
+                && !string.IsNullOrWhiteSpace(headline))
+                return headline;
             return fallback;
         }
 
