@@ -28,55 +28,66 @@ namespace RimSynapse.Psychology.API
             var coreComp = Find.World.GetComponent<SynapseCoreWorldComponent>();
             if (coreComp == null || !coreComp.TryDequeuePastEvent(out PastEvent pastEvent)) return false;
 
-            // Pick up to 3 colonists to generate memories for
-            var pawns = Find.CurrentMap.mapPawns.FreeColonists.OrderBy(_ => Rand.Value).Take(3).ToList();
-            if (pawns.Count == 0) return false;
+            // Target the pawns actually tied to the episode (Core#88), not 3 random colonists. Each tier
+            // colors the memory differently; uninvolved pawns get nothing.
+            var targets = new List<KeyValuePair<Pawn, string>>();
+            AddTargetTier(targets, pastEvent.involvedPawnIds, "involved");
+            AddTargetTier(targets, pastEvent.witnessPawnIds, "witness");
+            AddTargetTier(targets, pastEvent.afterEffectPawnIds, "aftermath");
 
-            string systemPrompt = @"You are the AI storyteller evaluating the psychology and memories of the specified RimWorld colonists.
-A significant event just occurred. For EACH colonist, write a third-person evaluative memory (using their name or 'he/she', never 'I' or 'my') describing how they likely felt at the time the event occurred.
+            // Impersonal/legacy events (quests, arrivals) with no involvement: a small colony sample so
+            // colony-wide news is still remembered — but personal events no longer hit random bystanders.
+            if (targets.Count == 0)
+            {
+                foreach (var p in Find.CurrentMap.mapPawns.FreeColonists.OrderBy(_ => Rand.Value).Take(2))
+                    targets.Add(new KeyValuePair<Pawn, string>(p, "colony"));
+            }
+            if (targets.Count == 0) return false;
+            if (targets.Count > 5) targets = targets.Take(5).ToList();  // bound fan-out on mass events
+
+            bool isEpisode = pastEvent.occurrenceCount > 1;
+            string episodeLine = isEpisode
+                ? "This was a SUSTAINED episode (it happened many times over a period) — write ONE reflective memory of the whole ordeal, not a play-by-play.\n"
+                : "";
+
+            string systemPrompt = @"You are the AI storyteller writing each listed RimWorld colonist's OWN memory of an event.
+For EACH colonist, write a third-person memory using THEIR stated pronouns (never 'I'/'my'), colored by their ROLE:
+- involved: first-hand — they were in it.
+- witness: they saw it happen to others.
+- aftermath: they only dealt with the consequences later (e.g. tended the wounded, buried the dead) and never saw the event itself.
+- colony: a general colony member reacting to the news.
 
 INSTRUCTIONS:
-1. EVALUATIVE NARRATION: Do not just write melodrama. Blends their personal traits, current needs (e.g., hunger, mood), and environment to evaluate their state:
-   - If they are starving or in danger, their worry about survival might dull their grief over a friend's death.
-   - If life is exceptionally comfortable (high mood/wealth), they might find recovery from tragedy easier.
-   - If they have traits like Psychopath, they might focus on cold rain or practical matters rather than emotional loss.
-2. EVENT SCALE & LENGTH:
-   - MAJOR/DEFINING EVENTS (e.g., death of a spouse/close relative, first kill, a colonist joining, legendary craft, major raid): Generate a detailed 2-3 sentence narrative memory. Set Weight between 0.5 and 1.0 (use 0.8-1.0 for permanent, defining memories), and Decay between 0.0 and 0.05 (0.0 for permanent).
-   - STANDARD/MINOR EVENTS: Generate a brief, single-sentence memory (10-15 words). Set Weight between 0.05 and 0.5, and Decay between 0.1 and 0.5.
-   (All weights are on a 0.0-1.0 scale.)
-3. DESENSITIZATION: Consider their lifetime statistics. A veteran killer is not traumatized by another death, but their first kill is life-altering.
-
-You MUST respond strictly in valid JSON format:
+1. EVALUATIVE NARRATION: blend their traits, mood, needs and burdens — do not just write melodrama. A veteran killer is not traumatized by another death; a first kill is life-altering; a psychopath fixates on practicalities over grief.
+2. DYNAMIC LENGTH — match the length to how momentous this was for THIS pawn. A defining, epic ordeal earns a full, vivid multi-sentence memory; a trivial event a single brief line. Do NOT pad a minor event and do NOT truncate a major one. There is no fixed sentence limit.
+3. WEIGHT/DECAY: defining events → Weight 0.8-1.0, Decay 0.0-0.05; significant → Weight 0.5-0.8, Decay 0.05-0.15; minor → Weight 0.05-0.5, Decay 0.15-0.5. (0.0-1.0 scale.)
+" + episodeLine + @"
+You MUST respond strictly in valid JSON:
 {
   ""Memories"": [
-    {
-      ""PawnId"": ""ThingID_Here"",
-      ""Summary"": ""Though the loss of his friend weighed on Fred, his immediate starvation and the falling cold rain occupied his mind, leaving him feeling strangely detached from the tragedy."",
-      ""Tags"": [""Death"", ""Grief"", ""Starvation""],
-      ""Weight"": 0.6,
-      ""Decay"": 0.15
-    }
+    { ""PawnId"": ""ThingID_Here"", ""Summary"": ""..."", ""Tags"": [""...""], ""Weight"": 0.6, ""Decay"": 0.15 }
   ]
 }";
 
-            string userMessage = $"Event: {pastEvent.eventDescription}\nColony Status at the time: {pastEvent.colonySnapshot}\n\nTarget Pawns:\n";
-            foreach (var pawn in pawns)
+            string sevStr = pastEvent.severity.ToString();
+            string timesStr = isEpisode ? $" (occurred ~{pastEvent.occurrenceCount} times)" : "";
+            string userMessage = $"Event [{sevStr}]{timesStr}: {pastEvent.eventDescription}\nColony Status at the time: {pastEvent.colonySnapshot}\n\nColonists:\n";
+            foreach (var kv in targets)
             {
+                Pawn pawn = kv.Key;
                 var pCoreComp = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
                 float threshold = RimSynapsePsychologyMod.Settings != null ? RimSynapsePsychologyMod.Settings.sensitivityThreshold : 0.5f;
                 string lifetimeBurdens = pCoreComp != null ? pCoreComp.GetTopMemoryBurdens(3, threshold) : "None";
-                
                 int lifetimeKills = pawn.records?.GetAsInt(RecordDefOf.KillsHumanlikes) ?? 0;
-                
-                string snapshot = pastEvent.pawnSnapshots != null && pastEvent.pawnSnapshots.ContainsKey(pawn.ThingID) 
-                    ? pastEvent.pawnSnapshots[pawn.ThingID] 
+                string snapshot = pastEvent.pawnSnapshots != null && pastEvent.pawnSnapshots.ContainsKey(pawn.ThingID)
+                    ? pastEvent.pawnSnapshots[pawn.ThingID]
                     : "Unknown";
-                    
-                userMessage += $"- Name: {pawn.Name.ToStringShort}, ID: {pawn.ThingID}\n  Status at the time: {snapshot}\n  Lifetime Kills: {lifetimeKills}\n  Current Psychological Burdens: {lifetimeBurdens}\n\n";
+
+                userMessage += $"- Name: {pawn.Name.ToStringShort}, ID: {pawn.ThingID}, Role: {kv.Value}, Pronouns: {PronounsFor(pawn)}\n  Status at the time: {snapshot}\n  Lifetime Kills: {lifetimeKills}\n  Current Psychological Burdens: {lifetimeBurdens}\n\n";
             }
 
-            // Use priority -1 so it stays at the absolute bottom of the queue and yields to real events
-            var options = new ChatOptions { priority = 8, requestName = "Opportunistic Memory", targetName = "Multiple Pawns" };
+            var pawns = targets.Select(t => t.Key).ToList();
+            var options = new ChatOptions { priority = 8, requestName = "Opportunistic Memory", targetName = pastEvent.mcpTag ?? "Episode" };
 
             SynapseClient.PromptAsync(
                 RimSynapsePsychologyMod.ModHandle,
@@ -114,6 +125,9 @@ You MUST respond strictly in valid JSON format:
                                             decayRate = Convert.ToSingle(memDict["Decay"]), // class-driven decay applies the multiplier at decay time
                                             tags = tagsList,
                                             memoryType = "EventReflection",
+                                            subjectPawnIds = pastEvent.involvedPawnIds != null
+                                                ? new List<string>(pastEvent.involvedPawnIds)
+                                                : new List<string>(),
                                             absTick = SynapseDateHelper.GameTickToAbsTick(pastEvent.gameTick),
                                             gameTick = pastEvent.gameTick
                                         });
@@ -132,6 +146,43 @@ You MUST respond strictly in valid JSON format:
             );
             return true;
         }
+
+        /// <summary>Resolve an involvement-tier id list to live colonist pawns, tagged with their role,
+        /// de-duplicating pawns already added by an earlier (higher-priority) tier.</summary>
+        private static void AddTargetTier(List<KeyValuePair<Pawn, string>> targets, List<string> ids, string role)
+        {
+            if (ids == null) return;
+            foreach (var id in ids)
+            {
+                Pawn p = PawnById(id);
+                if (p == null || !p.IsColonist || p.Dead) continue;
+                if (targets.Any(t => t.Key == p)) continue;
+                targets.Add(new KeyValuePair<Pawn, string>(p, role));
+            }
+        }
+
+        private static Pawn PawnById(string thingId)
+        {
+            if (string.IsNullOrEmpty(thingId) || Find.Maps == null) return null;
+            foreach (var m in Find.Maps)
+            {
+                var p = m.mapPawns?.AllPawns?.FirstOrDefault(x => x.ThingID == thingId);
+                if (p != null) return p;
+            }
+            return null;
+        }
+
+        private static string PronounsFor(Pawn p)
+        {
+            if (p == null) return "they/them";
+            switch (p.gender)
+            {
+                case Gender.Female: return "she/her";
+                case Gender.Male: return "he/him";
+                default: return "they/them";
+            }
+        }
+
         /// <summary>
         /// Triggered by the Core framework when the LLM queue is idle.
         /// Generates memory-first backstories for important non-colonist visitors.

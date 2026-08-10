@@ -66,6 +66,52 @@ namespace RimSynapse.Psychology.Utils
             RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Requested voice (re)generation for {p.LabelShort}.");
         }
 
+        [DebugAction("RimSynapse", "Core: Dump event episodes (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void DumpEventEpisodes()
+        {
+            var wc = Find.World?.GetComponent<SynapseCoreWorldComponent>();
+            if (wc == null) { RimSynapse.SynapseLogger.Info("core", "[RimSynapse] No core world component."); return; }
+            RimSynapse.SynapseLogger.Info("core", $"--- Event backlog: {wc.BacklogCount} episode(s) ---");
+            foreach (var e in wc.AllEvents)
+            {
+                RimSynapse.SynapseLogger.Info("core",
+                    $"  [{e.severity}] {e.CoalesceKey} x{e.occurrenceCount} " +
+                    $"(involved {e.involvedPawnIds.Count}, witness {e.witnessPawnIds.Count}, aftermath {e.afterEffectPawnIds.Count}) : \"{e.eventDescription}\"");
+            }
+        }
+
+        /// <summary>Playtest sim (Core#88): flood the clicked pawn with 27 trivial claw wounds + one
+        /// serious one from a crow, then dump — expect one coalesced episode (x27) + one distinct serious.</summary>
+        [DebugAction("RimSynapse", "Core: Simulate injury burst (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void SimulateInjuryBurst(Pawn p)
+        {
+            if (p == null) return;
+            var wc = Find.World?.GetComponent<SynapseCoreWorldComponent>();
+            if (wc == null) return;
+            string tag = $"Injury({p.LabelShort} vs a crow)";
+            for (int i = 0; i < 27; i++)
+            {
+                wc.EnqueuePastEvent(new RimSynapse.Models.PastEvent
+                {
+                    mcpTag = tag,
+                    category = "ColonistInjured",
+                    severity = RimSynapse.Models.EventSeverity.Trivial,
+                    eventDescription = $"{p.LabelShort} suffered a scratch from a crow.",
+                    involvedPawnIds = new System.Collections.Generic.List<string> { p.ThingID }
+                });
+            }
+            wc.EnqueuePastEvent(new RimSynapse.Models.PastEvent
+            {
+                mcpTag = tag,
+                category = "ColonistInjured",
+                severity = RimSynapse.Models.EventSeverity.Serious,
+                eventDescription = $"{p.LabelShort} took a deep gash to the leg from the crow.",
+                involvedPawnIds = new System.Collections.Generic.List<string> { p.ThingID }
+            });
+            RimSynapse.SynapseLogger.Info("core", $"[RimSynapse] Simulated 27 trivial + 1 serious crow wound on {p.LabelShort}. Backlog now {wc.BacklogCount}.");
+            DumpEventEpisodes();
+        }
+
         [DebugAction("RimSynapse", "Psychology: Add Random Memory", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void AddRandomMemory(Pawn p)
         {
