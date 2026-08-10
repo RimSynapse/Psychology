@@ -74,6 +74,11 @@ namespace RimSynapse.Psychology.Comps
         // Stage 2: cooldown gate between AI-driven trait changes (#46). Absolute tick of the last change.
         public long lastTraitChangeTick = -1;
 
+        // Coping layer (skill-driven trait engine): active temporary breaks/strikes with lift conditions,
+        // plus per-domain recurrence counts so repeated breaks harden into a permanent aversion.
+        public List<RimSynapse.Psychology.Models.CopingState> copingStates = new List<RimSynapse.Psychology.Models.CopingState>();
+        public Dictionary<string, int> aversionRecurrence = new Dictionary<string, int>();
+
         private const int TickIntervalDay = 60000;
         private const int TickInterval6Hours = 15000;
 
@@ -104,6 +109,10 @@ namespace RimSynapse.Psychology.Comps
             if (therapyTranscripts == null) therapyTranscripts = new List<RimSynapse.Psychology.Models.TherapyTranscript>();
             Scribe_Values.Look(ref savedAverageMood, "savedAverageMood", 0.5f);
             Scribe_Values.Look(ref lastTraitChangeTick, "lastTraitChangeTick", -1L);
+            Scribe_Collections.Look(ref copingStates, "copingStates", LookMode.Deep);
+            Scribe_Collections.Look(ref aversionRecurrence, "aversionRecurrence", LookMode.Value, LookMode.Value);
+            if (copingStates == null) copingStates = new List<RimSynapse.Psychology.Models.CopingState>();
+            if (aversionRecurrence == null) aversionRecurrence = new Dictionary<string, int>();
             Scribe_Values.Look(ref hasCheckedAdulthood, "hasCheckedAdulthood", false);
 
             Scribe_Collections.Look(ref medicalProfile, "medicalProfile", LookMode.Value, LookMode.Value);
@@ -186,8 +195,14 @@ namespace RimSynapse.Psychology.Comps
                         {
                             isAwaitingJournalUpdate = true;
                             savedAverageMood = moodSamples > 0 ? (dailyMoodAccumulator / moodSamples) : pawn.needs.mood.CurLevelPercentage;
-                            
-//
+
+                            // Skill-driven trait engine (#60): fold the day's measured behaviour into trait
+                            // pressure and run the escalation ladder (growing unease vs a rare permanent
+                            // shift). Deterministic and LLM-independent — it runs whether or not tonight's
+                            // clinical review reaches a model.
+                            var coreForTraits = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
+                            if (coreForTraits != null)
+                                RimSynapse.Psychology.API.SynapseTraitEngine.ProcessRestEdge(pawn, coreForTraits, savedAverageMood);
 
                             // Reset daily tracking immediately so we can start recording the next day
                             dailyMoodAccumulator = 0f;

@@ -11,6 +11,9 @@ namespace RimSynapse.Psychology.Settings
         // ── Stage 3 balance knobs (design §7) ──────────────────────────
         public float shiftThreshold = 1.0f;            // trait pressure needed to fire a change
         public float shiftPressureDecay = 0.2f;        // per-day decay of accumulated trait pressure
+        public float traitShiftChancePerDay = 0.005f;  // once at threshold, daily chance a permanent shift fires (0 = never; mood-only)
+        public float copingChancePerDay = 0.15f;        // once at threshold on a work-stressor, daily chance a temporary coping (strike/break) fires
+        public int aversionBreakDays = 2;               // how long a temporary break/strike lasts before timing out
         public float consolidationThreshold = 1.0f;    // salience needed to consolidate a memory long-term
         public int referenceThreshold = 3;             // reference count that consolidates a memory
         public float abandonmentThreshold = 90f;       // AbandonmentRiskScore above which a pawn may leave
@@ -26,6 +29,7 @@ namespace RimSynapse.Psychology.Settings
 
             Scribe_Values.Look(ref shiftThreshold, "shiftThreshold", 1.0f);
             Scribe_Values.Look(ref shiftPressureDecay, "shiftPressureDecay", 0.2f);
+            Scribe_Values.Look(ref traitShiftChancePerDay, "traitShiftChancePerDay", 0.005f);
             Scribe_Values.Look(ref consolidationThreshold, "consolidationThreshold", 1.0f);
             Scribe_Values.Look(ref referenceThreshold, "referenceThreshold", 3);
             Scribe_Values.Look(ref abandonmentThreshold, "abandonmentThreshold", 90f);

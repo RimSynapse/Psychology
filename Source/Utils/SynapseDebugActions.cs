@@ -46,6 +46,224 @@ namespace RimSynapse.Psychology.Utils
             }
         }
 
+        [DebugAction("RimSynapse", "Skill Engine: Dump signals (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void DumpSkillSignals(Pawn p)
+        {
+            if (p == null) return;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.Name} has no SynapseCorePawnComp."); return; }
+
+            core.GetActivityMetrics(out float idle, out float violence);
+            float todayMood = p.needs?.mood?.CurLevelPercentage ?? 0.5f;
+            float reinf = RimSynapse.Psychology.API.SynapseTraitEngine.PeekReinforcement(core, todayMood);
+            float stress = RimSynapse.Psychology.API.SynapseTraitEngine.ComputeStress(p, todayMood);
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Skill signals for {p.LabelShort} --- mood={todayMood:P0} baseline={core.moodBaseline:0.00} reinforcement={reinf:+0.00;-0.00} stress={stress:0.00} idle={idle:P0} livingViolence={violence:P0}");
+            if (p.skills?.skills != null)
+                foreach (var rec in p.skills.skills.Where(r => r.passion != RimWorld.Passion.None || r.xpSinceMidnight > 0f))
+                    RimSynapse.SynapseLogger.Info("psychology", $"  skill {rec.def.defName} L{rec.Level} passion={rec.passion} xpToday={rec.xpSinceMidnight:0}");
+
+            var signals = SynapseSkillAxisMap.SampleSignals(p, core, reinf, stress);
+            RimSynapse.SynapseLogger.Info("psychology", $"Derived {signals.Count} signal(s):");
+            foreach (var s in signals)
+                RimSynapse.SynapseLogger.Info("psychology", $"  -> {s.candidateId}  +{s.dailyPressure:0.00}  [{s.reason}]");
+
+            RimSynapse.SynapseLogger.Info("psychology", $"Current pressures ({core.traitPressures.Count}):");
+            foreach (var kv in core.traitPressures)
+                RimSynapse.SynapseLogger.Info("psychology", $"  {kv.Key} = {kv.Value.pressure:0.00} (peak {kv.Value.peak:0.00})");
+
+            bool confronts = RimSynapse.Psychology.API.SynapseTraitEngine.Confronts(p);
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"Coping: {(confronts ? "CONFRONTS" : "AVOIDS")} | breakThrMinor={p.mindState?.mentalBreaker?.BreakThresholdMinor:0.00}");
+            if (p.story?.traits?.allTraits != null)
+                foreach (var t in p.story.traits.allTraits)
+                    RimSynapse.SynapseLogger.Info("psychology", $"  trait def={t.def.defName} degree={t.Degree} label={t.Label}");
+        }
+
+        [DebugAction("RimSynapse", "Skill Engine: Simulate fixation day (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void SimulateFixationDay(Pawn p)
+        {
+            if (p == null || p.skills == null) return;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) return;
+
+            // Dominant, fulfilled passion: Plants (worked hard today). Starved passion: Intellectual (untouched).
+            var plants = p.skills.GetSkill(SkillDefOf.Plants);
+            var intel = p.skills.GetSkill(SkillDefOf.Intellectual);
+            if (plants != null) { plants.passion = RimWorld.Passion.Major; plants.Learn(1600f, direct: true); }
+            if (intel != null) { intel.passion = RimWorld.Passion.Major; }
+
+            // Prime a normally-content baseline, then simulate a stressed day (low mood) so the multidimensional
+            // crash-out actually fires: fulfilled-but-mood-fell burnout + stressed rejection of the neglected skill.
+            core.moodBaseline = 0.6f;
+            RimSynapse.Psychology.API.SynapseTraitEngine.ProcessRestEdge(p, core, 0.25f);
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse] Simulated a stressed fixation day for {p.LabelShort} (Plants fulfilled, Intellectual starved, mood 0.25). Pressures now:");
+            foreach (var kv in core.traitPressures)
+                RimSynapse.SynapseLogger.Info("psychology", $"  {kv.Key} = {kv.Value.pressure:0.00}");
+        }
+
+        [DebugAction("RimSynapse", "Skill Engine: Force research aversion (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ForceResearchAversion(Pawn p)
+        {
+            if (p == null) return;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) return;
+
+            long now = Find.TickManager != null ? Find.TickManager.TicksAbs : 0L;
+            // Walk one step along the intellectual aversion each call: none -> reluctant -> research-averse
+            // -> (finally) research-broken (incapable). Pick the right candidate from the pawn's current degree.
+            var distaste = DefDatabase<TraitDef>.GetNamedSilentFail("Synapse_Aversion_Intellectual");
+            int maxDeg = (distaste?.degreeDatas != null && distaste.degreeDatas.Count > 0) ? distaste.degreeDatas.Max(d => d.degree) : 0;
+            int cur = p.story?.traits?.DegreeOfTrait(distaste) ?? 0;
+            string cand = cur < maxDeg
+                ? RimSynapse.Models.TraitAxis.SpectrumCandidate("Synapse_Aversion_Intellectual", cur + 1)
+                : RimSynapse.Models.TraitAxis.SingleCandidate("Synapse_Incapable_Intellectual", true);
+            core.AccumulateTraitPressure(cand, 2f, "add", 0f, now, SynapseCorePawnComp.TraitPressureDecayPerDay);
+            string fired = RimSynapse.Psychology.API.SynapseTraitEngine.ForceTopShift(p, core);
+
+            var research = DefDatabase<WorkTypeDef>.GetNamedSilentFail("Research");
+            bool disabled = research != null && p.WorkTypeIsDisabled(research);
+            int newDeg = p.story?.traits?.DegreeOfTrait(distaste) ?? 0;
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse] {p.LabelShort}: fired '{fired ?? "(none)"}'. Distaste degree {cur}->{newDeg}. Research disabled: {disabled}.");
+        }
+
+        // ── Testing accelerators: inject history + simulate long-term pressure without waiting days ──
+
+        private static void InjectMem(SynapseCorePawnComp core, string summary, string type, float weight,
+            long absTick, bool longTerm, params string[] tags)
+        {
+            var mem = new WeightedMemory
+            {
+                summary = summary, memoryType = type, weight = weight, baseWeight = weight,
+                isLongTerm = longTerm, absTick = absTick, tags = tags?.ToList() ?? new System.Collections.Generic.List<string>()
+            };
+            core.AddMemory(mem);
+        }
+
+        [DebugAction("RimSynapse", "Memory: Inject backdated history (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void InjectBackdatedHistory(Pawn p)
+        {
+            if (p == null) return;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) return;
+            long now = Find.TickManager.TicksAbs;
+            const long D = 60000L;
+            InjectMem(core, "Watched a raider gun down a close friend during the winter siege.", "EventReflection", 0.85f, now - 14 * D, true, "grief", "combat", "death");
+            InjectMem(core, "Spent weeks hunched over the research bench, and it finally paid off.", "EventReflection", 0.5f, now - 11 * D, false, "work", "intellectual");
+            InjectMem(core, "Butchered a manhunter pack and felt a grim, unsettling satisfaction.", "EventReflection", 0.6f, now - 8 * D, false, "combat", "violence");
+            InjectMem(core, "Argued bitterly with a bunkmate over dwindling food rations.", "EventReflection", 0.45f, now - 5 * D, false, "social", "conflict");
+            InjectMem(core, "Missed the harvest again; the fields have gone to weeds.", "EventReflection", 0.5f, now - 3 * D, false, "work", "plants", "neglect");
+            InjectMem(core, "Sat alone through another sleepless, anxious night.", "EventReflection", 0.55f, now - 1 * D, false, "mood", "stress");
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse] Injected 6 backdated memories into {p.LabelShort}.\n{SynapseCoreDebug.DumpMemories(core)}");
+        }
+
+        [DebugAction("RimSynapse", "Skill Engine: Simulate 12 fixation days (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void SimulateFixationArc(Pawn p)
+        {
+            if (p == null || p.skills == null) return;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) return;
+            var plants = p.skills.GetSkill(SkillDefOf.Plants);
+            var intel = p.skills.GetSkill(SkillDefOf.Intellectual);
+            if (plants != null) plants.passion = RimWorld.Passion.Major;
+            if (intel != null) intel.passion = RimWorld.Passion.Major;
+            core.moodBaseline = 0.6f; // normally content, so a stressed day reads as a real drop
+
+            for (int day = 1; day <= 12; day++)
+            {
+                if (plants != null) plants.xpSinceMidnight = 2000f; // fulfilled: worked the fields hard
+                if (intel != null) intel.xpSinceMidnight = 0f;      // starved: never touched research
+                RimSynapse.Psychology.API.SynapseTraitEngine.ProcessRestEdge(p, core, 0.28f); // stressed day
+            }
+            bool confronts = RimSynapse.Psychology.API.SynapseTraitEngine.Confronts(p);
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Fixation arc for {p.LabelShort} (12 stressed days) --- coping style: {(confronts ? "CONFRONTS (strike)" : "AVOIDS (withdraw)")} ---");
+            foreach (var kv in core.traitPressures.OrderByDescending(k => k.Value.pressure))
+                RimSynapse.SynapseLogger.Info("psychology", $"  {kv.Key} = {kv.Value.pressure:0.00} (peak {kv.Value.peak:0.00})");
+            string style = RimSynapse.Psychology.API.SynapseTraitEngine.ForceCoping(p, core);
+            RimSynapse.SynapseLogger.Info("psychology", $"  => coping fired: {style ?? "(nothing over threshold)"}");
+            var psych = p.TryGetComp<SynapsePawnComp>();
+            if (psych?.copingStates != null)
+                foreach (var cs in psych.copingStates)
+                    RimSynapse.SynapseLogger.Info("psychology", $"     active {cs.label}: {cs.traitDefName}{(cs.conditionSkillDefName != null ? " until " + cs.conditionSkillDefName : "")}");
+        }
+
+        [DebugAction("RimSynapse", "Skill Engine: Simulate 12 bloodlust days (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void SimulateBloodlustArc(Pawn p)
+        {
+            if (p == null) return;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) return;
+            core.moodBaseline = 0.5f;
+
+            for (int day = 1; day <= 12; day++)
+            {
+                int now = Find.TickManager.TicksGame;
+                core.recentJobs.Clear();
+                core.recentJobs.Add(new JobInterval("AttackMelee", now - 50000, 50000, "humanlike"));
+                core.lastJobStartedTick = -1; // no ongoing job to dilute the fraction
+                // Mood ABOVE baseline: they feel good after the killing -> positive reinforcement -> Bloodlust.
+                RimSynapse.Psychology.API.SynapseTraitEngine.ProcessRestEdge(p, core, 0.72f);
+            }
+            RimSynapse.SynapseLogger.Info("psychology", $"--- Bloodlust arc for {p.LabelShort} (12 violent, high-mood days) ---");
+            foreach (var kv in core.traitPressures.OrderByDescending(k => k.Value.pressure))
+                RimSynapse.SynapseLogger.Info("psychology", $"  {kv.Key} = {kv.Value.pressure:0.00} (peak {kv.Value.peak:0.00})");
+            string fired = RimSynapse.Psychology.API.SynapseTraitEngine.ForceTopShift(p, core);
+            RimSynapse.SynapseLogger.Info("psychology", $"  => forced shift: {fired ?? "(nothing over threshold)"}");
+        }
+
+        [DebugAction("RimSynapse", "Skill Engine: Lift coping now (serve/expire)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void LiftCopingNow(Pawn p)
+        {
+            if (p == null) return;
+            var psych = p.TryGetComp<SynapsePawnComp>();
+            if (psych?.copingStates == null || psych.copingStates.Count == 0)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no active coping to lift.");
+                return;
+            }
+            int before = psych.copingStates.Count;
+            // Serve every demanded passion (mark it exercised) so condition-gated strikes lift.
+            foreach (var cs in psych.copingStates)
+            {
+                if (string.IsNullOrEmpty(cs.conditionSkillDefName)) continue;
+                var sd = DefDatabase<SkillDef>.GetNamedSilentFail(cs.conditionSkillDefName);
+                var rec = sd != null ? p.skills?.GetSkill(sd) : null;
+                if (rec != null) rec.xpSinceMidnight = SynapseSkillAxisMap.PracticeXp;
+            }
+            RimSynapse.Psychology.API.SynapseTraitEngine.LiftCoping(p, psych);
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse] {p.LabelShort}: served/expired coping. {before - psych.copingStates.Count} lifted, {psych.copingStates.Count} remain. Traits now: {string.Join(", ", p.story.traits.allTraits.Select(t => t.Label))}");
+        }
+
+        [DebugAction("RimSynapse", "Skill Engine: Reset trait state (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ResetTraitState(Pawn p)
+        {
+            if (p == null) return;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) return;
+            core.traitPressures?.Clear();
+            core.moodBaseline = -1f;
+            core.skillLevelSnapshot?.Clear();
+            core.skillXpSinceLevelSnapshot?.Clear();
+            var psych = p.TryGetComp<SynapsePawnComp>();
+            psych?.copingStates?.Clear();
+            psych?.aversionRecurrence?.Clear();
+            // Strip any engine-applied aversion / incapable / strike traits so a scenario can be re-run cleanly.
+            var toClear = new System.Collections.Generic.List<string> { "Synapse_Strike_Hauling", "Synapse_Strike_Cleaning" };
+            foreach (var d in SynapseSkillAxisMap.WorkDomains) { toClear.Add(d.aversionTraitDef); toClear.Add(d.incapableTraitDef); }
+            foreach (var defName in toClear)
+            {
+                var def = DefDatabase<TraitDef>.GetNamedSilentFail(defName);
+                if (def != null && p.story?.traits != null && p.story.traits.HasTrait(def))
+                    SynapsePsychology.ApplyTraitDirective(p, defName, false, "debug reset");
+            }
+            RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Reset trait-engine state for {p.LabelShort}.");
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpVoice(Pawn p)
         {

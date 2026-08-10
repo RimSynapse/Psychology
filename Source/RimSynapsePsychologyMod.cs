@@ -143,6 +143,9 @@ namespace RimSynapse.Psychology
             listingStandard.Label($"Evaluation Cadence: every {Settings.evalCadence} day(s)", tooltip: "How often the nightly psychology evaluation runs per colonist. Higher = fewer LLM calls / lower token cost.");
             Settings.evalCadence = (int)listingStandard.Slider(Settings.evalCadence, 1f, 7f);
 
+            listingStandard.Label($"Trait Shift Chance: {(Settings.traitShiftChancePerDay * 100f):F1}% / day", tooltip: "Once behaviour has pushed trait pressure past the threshold, the daily chance a permanent trait shift actually fires. Below threshold the pawn only gets a growing 'unease' mood. Set to 0 to disable permanent shifts entirely (mood-only).");
+            Settings.traitShiftChancePerDay = listingStandard.Slider(Settings.traitShiftChancePerDay, 0f, 0.10f);
+
             Settings.ApplyToCore();
 
             listingStandard.Gap(12f);
