@@ -136,8 +136,34 @@ namespace RimSynapse.Psychology.Utils
         public static void ForceDailyReview(Pawn p)
         {
             if (p == null) return;
-            SynapsePsychology.QueueDailyPsychologyReview(p, 0.5f, new System.Collections.Generic.List<WeightedMemory>());
-            RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Forced daily psychology review for {p.Name}");
+            // Use the pawn's REAL current mood + recent memories (not a hardcoded 0.5 / empty list) so the
+            // review actually reflects their situation — essential for testing trouble → eval → badges.
+            float mood = p.needs?.mood?.CurLevelPercentage ?? 0.5f;
+            long nowAbs = Find.TickManager.TicksAbs;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            var recent = core?.memories?.Where(m => nowAbs - m.absTick < 60000).ToList()
+                         ?? new System.Collections.Generic.List<WeightedMemory>();
+            SynapsePsychology.QueueDailyPsychologyReview(p, mood, recent);
+            RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Forced daily review for {p.Name} (mood {mood:P0}, {recent.Count} recent memories)");
+        }
+
+        /// <summary>Testing aid: put a colonist in genuine distress — real injuries (pain → mood drop, which
+        /// drives the live Mood badge) plus a grief/trauma memory for the evaluation to reason about.</summary>
+        [DebugAction("RimSynapse", "Psychology: Trouble pawn (injuries + grief)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void TroublePawn(Pawn p)
+        {
+            if (p == null) return;
+            for (int i = 0; i < 6; i++)
+                p.TakeDamage(new DamageInfo(DamageDefOf.Cut, 10f, 0f, -1f, null, null, null));
+
+            SynapsePsychology.AddMemory(p, new WeightedMemory
+            {
+                summary = $"{p.LabelShort} barely survived a savage mauling and watched a friend bleed out in the mud.",
+                weight = 0.9f, baseWeight = 0.9f, memoryType = "EventReflection",
+                tags = new System.Collections.Generic.List<string> { "Death", "Grief", "Trauma" },
+                absTick = Find.TickManager.TicksAbs, isLongTerm = false
+            });
+            RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Troubled {p.LabelShort}: 6 cuts + grief memory. Mood now {(p.needs?.mood?.CurLevelPercentage ?? 0f):P0}.");
         }
 
         [DebugAction("RimSynapse", "Psychology: Force Break Sweep (all colonists)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
