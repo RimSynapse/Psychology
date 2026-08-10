@@ -20,10 +20,10 @@ namespace RimSynapse.Psychology.Patches
             var comp = __instance.pawn.GetComp<SynapsePawnComp>();
             if (comp == null || comp.breakIntensity != BreakIntensity.Light) return;
 
-            bool isDepressive = __instance.pawn.story?.traits?.HasTrait(DefDatabase<TraitDef>.GetNamedSilentFail("Depressive")) == true ||
-                                __instance.pawn.story?.traits?.HasTrait(DefDatabase<TraitDef>.GetNamedSilentFail("Pessimist")) == true;
-            bool isBloodlust = __instance.pawn.story?.traits?.HasTrait(DefDatabase<TraitDef>.GetNamedSilentFail("Bloodlust")) == true ||
-                               __instance.pawn.story?.traits?.HasTrait(DefDatabase<TraitDef>.GetNamedSilentFail("Psychopath")) == true;
+            bool isDepressive = __instance.pawn.story?.traits?.HasTrait(PsychologyDefCache.Depressive) == true ||
+                                __instance.pawn.story?.traits?.HasTrait(PsychologyDefCache.Pessimist) == true;
+            bool isBloodlust = __instance.pawn.story?.traits?.HasTrait(PsychologyDefCache.Bloodlust) == true ||
+                               __instance.pawn.story?.traits?.HasTrait(PsychologyDefCache.Psychopath) == true;
 
             // Handle Light intensity abort conditions
             if (__instance.def.defName == "Synapse_SuicidalBurn")

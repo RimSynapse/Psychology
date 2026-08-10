@@ -14,22 +14,53 @@ namespace RimSynapse.Psychology.Managers
 
         public override void GameComponentTick()
         {
-            // Evaluate every 150 ticks, matching vanilla MentalBreaker update interval
-            if (Find.TickManager.TicksGame % 150 == 0)
+            if (!Enabled) return;
+
+            // Per-pawn hash-staggered evaluation, still once per 150 ticks per pawn to match
+            // the vanilla MentalBreaker update interval. This replaces a single global
+            // "TicksGame % 150 == 0" gate that evaluated the WHOLE colony on the same tick,
+            // producing a periodic frame spike (the 0.8 perf pass measured ~0.356ms in Dubs
+            // Performance Analyzer, worst at 3x speed). IsHashIntervalTick offsets each pawn by
+            // its id, so the same amortized work spreads evenly across the 150-tick window and
+            // the spike disappears. The MTB rolls below keep their 150f interval — each pawn is
+            // still evaluated exactly once per 150 ticks — so break/euphoria odds are unchanged.
+            var maps = Find.Maps;
+            for (int m = 0; m < maps.Count; m++)
             {
-                if (!Enabled) return;
-
-                foreach (var map in Find.Maps)
+                var colonists = maps[m].mapPawns.FreeColonists;
+                for (int i = 0; i < colonists.Count; i++)
                 {
-                    foreach (var pawn in map.mapPawns.FreeColonists)
-                    {
-                        var comp = pawn.GetComp<SynapsePawnComp>();
-                        if (comp == null) continue;
+                    var pawn = colonists[i];
+                    if (!pawn.IsHashIntervalTick(150)) continue;
 
-                        CheckPawnMentalState(pawn, comp);
-                    }
+                    var comp = pawn.GetComp<SynapsePawnComp>();
+                    if (comp == null) continue;
+
+                    CheckPawnMentalState(pawn, comp);
                 }
             }
+        }
+
+        /// <summary>
+        /// Debug/validation hook: force a full break evaluation of every free colonist right now,
+        /// bypassing the per-pawn hash-interval gate. Returns the number of colonists evaluated.
+        /// Exercised headlessly by the "Force Break Sweep" debug action (0.8 perf validation).
+        /// </summary>
+        public int ForceEvaluateAll()
+        {
+            int count = 0;
+            foreach (var map in Find.Maps)
+            {
+                foreach (var pawn in map.mapPawns.FreeColonists)
+                {
+                    var comp = pawn.GetComp<SynapsePawnComp>();
+                    if (comp == null) continue;
+
+                    CheckPawnMentalState(pawn, comp);
+                    count++;
+                }
+            }
+            return count;
         }
 
         private void CheckPawnMentalState(Pawn pawn, SynapsePawnComp comp)
@@ -85,8 +116,8 @@ namespace RimSynapse.Psychology.Managers
             // --- EUPHORIA EVALUATION ---
             if (pawn.needs != null && pawn.needs.mood != null && pawn.needs.mood.CurLevelPercentage >= 0.85f)
             {
-                bool hasBipolar = pawn.story?.traits?.HasTrait(DefDatabase<TraitDef>.GetNamedSilentFail("Bipolar")) == true ||
-                                  pawn.story?.traits?.HasTrait(DefDatabase<TraitDef>.GetNamedSilentFail("Synapse_Bipolar")) == true;
+                bool hasBipolar = pawn.story?.traits?.HasTrait(PsychologyDefCache.Bipolar) == true ||
+                                  pawn.story?.traits?.HasTrait(PsychologyDefCache.Synapse_Bipolar) == true;
                 
                 // Extreme negative occurred within the last 5 days (300,000 ticks)
                 bool recentExtremeNegative = comp.lastExtremeNegativeTick > 0 && 
@@ -102,10 +133,10 @@ namespace RimSynapse.Psychology.Managers
                     }
                     
                     // MTB for reckless positive actions (e.g., 2 days)
-                    if (Rand.MTBEventOccurs(2.0f, 60000f, 150f))
+                    if (Rand.MTBEventOccurs(2.0f, 60000f, 150f) && PsychologyDefCache.Synapse_EuphoricReckless != null)
                     {
 //
-                        pawn.mindState.mentalStateHandler.TryStartMentalState(DefDatabase<MentalStateDef>.GetNamed("Synapse_EuphoricReckless"), "Euphoria");
+                        pawn.mindState.mentalStateHandler.TryStartMentalState(PsychologyDefCache.Synapse_EuphoricReckless, "Euphoria");
                     }
                 }
 

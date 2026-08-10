@@ -6,6 +6,7 @@ using RimWorld;
 using RimSynapse.Comps;
 using RimSynapse.Psychology.Comps;
 using RimSynapse.Psychology.API;
+using RimSynapse.Psychology.Managers;
 using RimSynapse.Models;
 
 namespace RimSynapse.Psychology.Utils
@@ -59,6 +60,19 @@ namespace RimSynapse.Psychology.Utils
             if (p == null) return;
             SynapsePsychology.QueueDailyPsychologyReview(p, 0.5f, new System.Collections.Generic.List<WeightedMemory>());
             RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Forced daily psychology review for {p.Name}");
+        }
+
+        [DebugAction("RimSynapse", "Psychology: Force Break Sweep (all colonists)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ForceBreakSweep()
+        {
+            var mgr = Current.Game?.GetComponent<SynapseBreakManager>();
+            if (mgr == null)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse] SynapseBreakManager not found (no active game?).");
+                return;
+            }
+            int n = mgr.ForceEvaluateAll();
+            RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Forced break sweep evaluated {n} colonist(s).");
         }
 
         [DebugAction("RimSynapse", "Psychology: Trigger Euphoria", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
