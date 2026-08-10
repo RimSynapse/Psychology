@@ -79,6 +79,10 @@ namespace RimSynapse.Psychology.Comps
         public List<RimSynapse.Psychology.Models.CopingState> copingStates = new List<RimSynapse.Psychology.Models.CopingState>();
         public Dictionary<string, int> aversionRecurrence = new Dictionary<string, int>();
 
+        // Phase 2: the LLM's pre-staged judgement + narration per candidate id (measured engine still fires;
+        // this only supplies verdict + flavour the engine consults at fire time).
+        public Dictionary<string, RimSynapse.Psychology.Models.TraitJudgmentRecord> traitJudgments = new Dictionary<string, RimSynapse.Psychology.Models.TraitJudgmentRecord>();
+
         private const int TickIntervalDay = 60000;
         private const int TickInterval6Hours = 15000;
 
@@ -111,8 +115,10 @@ namespace RimSynapse.Psychology.Comps
             Scribe_Values.Look(ref lastTraitChangeTick, "lastTraitChangeTick", -1L);
             Scribe_Collections.Look(ref copingStates, "copingStates", LookMode.Deep);
             Scribe_Collections.Look(ref aversionRecurrence, "aversionRecurrence", LookMode.Value, LookMode.Value);
+            Scribe_Collections.Look(ref traitJudgments, "traitJudgments", LookMode.Value, LookMode.Deep);
             if (copingStates == null) copingStates = new List<RimSynapse.Psychology.Models.CopingState>();
             if (aversionRecurrence == null) aversionRecurrence = new Dictionary<string, int>();
+            if (traitJudgments == null) traitJudgments = new Dictionary<string, RimSynapse.Psychology.Models.TraitJudgmentRecord>();
             Scribe_Values.Look(ref hasCheckedAdulthood, "hasCheckedAdulthood", false);
 
             Scribe_Collections.Look(ref medicalProfile, "medicalProfile", LookMode.Value, LookMode.Value);

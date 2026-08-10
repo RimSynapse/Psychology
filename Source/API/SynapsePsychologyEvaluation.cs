@@ -57,6 +57,57 @@ namespace RimSynapse.Psychology.API
         }
 
         /// <summary>
+        /// Phase 2: the judge/narrate candidate picture — the building changes with the exact ids the model
+        /// must copy back, a plain-English meaning, how close each is, and the pawn's coping style.
+        /// </summary>
+        public static string DescribeTraitCandidatesForPrompt(Pawn pawn, RimSynapse.Comps.SynapseCorePawnComp coreComp)
+        {
+            float threshold = RimSynapsePsychologyMod.Settings?.shiftThreshold ?? 1.0f;
+            if (threshold <= 0f) threshold = 1f;
+            var sb = new System.Text.StringBuilder();
+            string style = SynapseTraitEngine.Confronts(pawn)
+                ? "faces problems head-on (under strain, refuses drudge work to protect what matters most)"
+                : "avoids problems (under strain, withdraws from the hardest work)";
+            sb.AppendLine($"Coping style: {style}.");
+
+            if (coreComp?.traitPressures == null || coreComp.traitPressures.Count == 0)
+            {
+                sb.Append("Building changes: none right now.");
+                return sb.ToString();
+            }
+            sb.AppendLine("Building changes (id — meaning — closeness):");
+            foreach (var kvp in coreComp.traitPressures.OrderByDescending(k => k.Value.pressure).Take(6))
+            {
+                if (kvp.Value.pressure < 0.15f) continue;
+                int pct = (int)System.Math.Min(100f, kvp.Value.pressure / threshold * 100f);
+                sb.AppendLine($"- \"{kvp.Key}\" — {DescribeCandidate(pawn, kvp.Key)} — {pct}% of the way there");
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        private static string DescribeCandidate(Pawn pawn, string candidateId)
+        {
+            if (!RimSynapse.Models.TraitAxis.TryParse(candidateId, out string axisId, out int deg, out bool? single))
+                return candidateId;
+            var domA = SynapseSkillAxisMap.WorkDomains.FirstOrDefault(d => d.aversionTraitDef == axisId);
+            if (domA != null)
+                return deg >= 2 ? $"growing strongly averse to {domA.workTypeDef} work" : $"growing reluctant at {domA.workTypeDef} work";
+            var domI = SynapseSkillAxisMap.DomainByIncapable(axisId);
+            if (domI != null) return $"on the verge of refusing {domI.workTypeDef} work entirely";
+            var def = DefDatabase<TraitDef>.GetNamedSilentFail(axisId);
+            if (def != null)
+            {
+                if (single.HasValue)
+                {
+                    string lbl = def.degreeDatas != null && def.degreeDatas.Count > 0 ? def.degreeDatas[0].GetLabelFor(pawn) : def.label;
+                    return single.Value ? $"developing '{lbl}'" : $"losing '{lbl}'";
+                }
+                return $"drifting toward '{RimSynapse.Models.TraitAxis.LabelForDegree(def, deg, pawn)}'";
+            }
+            return candidateId;
+        }
+
+        /// <summary>
         /// Who the psychology system spends LLM calls on (#39): people the colony has a relationship with —
         /// colonists, prisoners and slaves of the colony, and quest lodgers who actually stay. NOT enemy
         /// pawns or passing traders/visitors. Cheap enough to run per-humanlike in TickRare.
@@ -94,9 +145,11 @@ You must also provide an 'AbandonmentRiskScore' (0-100) representing how likely 
 
 Finally, output a 'SocialAdjustments' object reflecting changes in their Trust (-100 to +100) and Familiarity (0 to 100) with other colonists based on recent events. Use the colonist's short name as the key. Trust offsets should be between -15 and +15. Familiarity offsets should be positive (0 to +10).
 
-Additionally, assess whether recent experiences are building toward a personality change. Do NOT apply changes directly — personality shifts accumulate over MULTIPLE days and a single day rarely fires one. Instead return:
-- 'PersonalityShiftLikelihood': one of ""none"" | ""low"" | ""moderate"" | ""high"" — your overall judgement of whether ANY shift is warranted right now. If ""none"" or ""low"", today contributes no pressure toward any change.
-- 'PersonalityShiftAssessment': an array of per-candidate-trait evidence for TODAY ONLY. Each entry: { ""trait"": <RimWorld trait defName>, ""direction"": ""add"" | ""remove"", ""dailyPressure"": 0.0-1.0 (how strong TODAY's evidence is), ""rationale"": <one sentence> }. Leave the array empty if nothing is building.
+The engine already measures which personality changes are building for this colonist from their ACTUAL behaviour and how they cope — you do NOT invent changes or set numbers. Your job is to JUDGE whether each building change rings true for who they are, and to NARRATE it. Here is the current picture:
+{TRAIT_CANDIDATES}
+Return:
+- 'PersonalityShiftLikelihood': ""none"" | ""low"" | ""moderate"" | ""high"" — your read of whether ANY of these changes is genuinely warranted right now.
+- 'TraitJudgment': an array, one entry per candidate above you have a view on. Each: { ""candidateId"": <copy an id EXACTLY from the list>, ""verdict"": ""in_character"" | ""out_of_character"" | ""uncertain"", ""flavor"": <one vivid, in-character sentence describing this change as if it just happened, for the overseer's notification> }. Use ""out_of_character"" ONLY when the change would betray who this colonist truly is despite the behaviour — that pushes back against it. Empty array if nothing is building; empty flavor if you have nothing to add.
 IMPORTANT — violence vs. the living: traits that reflect a taste for killing or cruelty (e.g. 'Bloodlust') require evidence of harming LIVING creatures (humanlikes or animals). Destroying inanimate objects, mining, or repeatedly attacking wrecked machinery is NOT violence against the living and must NEVER, on its own, justify adding 'Bloodlust' or removing protective/steadfast traits. If today's activity was primarily against objects, set dailyPressure near 0 and likelihood ""none""/""low"".
 IMPORTANT — trait resistance: respect the resistance values below. Protected traits must NOT be removed without overwhelming, sustained evidence.
 The colonist currently has these AI-added traits (added by you previously): {DYNAMIC_TRAITS}. Their current traits with resistance: {TRAIT_RESISTANCE}. Accumulated trait pressure so far (trajectory across days): {TRAIT_PRESSURES}.
@@ -111,8 +164,8 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
   ""Drives"": ""motivations and hard lines"",
   ""AbandonmentRiskScore"": 0,
   ""PersonalityShiftLikelihood"": ""none"",
-  ""PersonalityShiftAssessment"": [
-    { ""trait"": ""Bloodlust"", ""direction"": ""add"", ""dailyPressure"": 0.15, ""rationale"": ""Repeated combat, but only against an inert vehicle - weak signal."" }
+  ""TraitJudgment"": [
+    { ""candidateId"": ""NaturalMood#-1"", ""verdict"": ""in_character"", ""flavor"": ""The long grey months have settled into their bones; hope comes harder now."" }
   ],
   ""SocialAdjustments"": {
     ""ColonistName1"": {
@@ -228,6 +281,8 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
             // Stage 2: feed the trait-resistance dimension and the accumulated cross-day trajectory.
             systemPrompt = systemPrompt.Replace("{TRAIT_RESISTANCE}", SynapseTraitPolicy.DescribeResistanceForPrompt(pawn));
             systemPrompt = systemPrompt.Replace("{TRAIT_PRESSURES}", DescribeTraitPressures(coreComp));
+            // Phase 2: the judge/narrate candidate picture (ids the model must copy back).
+            systemPrompt = systemPrompt.Replace("{TRAIT_CANDIDATES}", DescribeTraitCandidatesForPrompt(pawn, coreComp));
 
             string userMessage = $@"Patient Name: {pawn.Name.ToStringShort}
 Gender: {pawn.gender}

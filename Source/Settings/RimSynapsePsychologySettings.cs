@@ -14,6 +14,7 @@ namespace RimSynapse.Psychology.Settings
         public float traitShiftChancePerDay = 0.005f;  // once at threshold, daily chance a permanent shift fires (0 = never; mood-only)
         public float copingChancePerDay = 0.15f;        // once at threshold on a work-stressor, daily chance a temporary coping (strike/break) fires
         public int aversionBreakDays = 2;               // how long a temporary break/strike lasts before timing out
+        public bool traitFeedbackEnabled = true;        // LLM "out_of_character" verdict pushes back on a building change (feedback loop)
         public float consolidationThreshold = 1.0f;    // salience needed to consolidate a memory long-term
         public int referenceThreshold = 3;             // reference count that consolidates a memory
         public float abandonmentThreshold = 90f;       // AbandonmentRiskScore above which a pawn may leave

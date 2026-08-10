@@ -83,6 +83,7 @@ namespace RimSynapse.Psychology.API
 
             // Non-aversion outcome (mood / bloodlust / wealth) — a rare PERMANENT shift.
             var top = over.OrderByDescending(kv => kv.Value.pressure).First();
+            if (IsVetoed(pawn, top.Key)) { DampenAndUnease(pawn, core, top.Key); return; }
             float pchance = Settings?.traitShiftChancePerDay ?? 0.005f;
             if (pchance > 0f && !RecentlyShifted(pawn) && Rand.Value < pchance)
                 FireShift(pawn, core, top.Key, top.Value);
@@ -147,6 +148,7 @@ namespace RimSynapse.Psychology.API
             }
 
             var top = aversions.OrderByDescending(kv => kv.Value.pressure).First();
+            if (IsVetoed(pawn, top.Key)) { DampenAndUnease(pawn, core, top.Key); return; }
             Withdraw(pawn, core, comp, top.Key, top.Value);
         }
 
@@ -171,9 +173,10 @@ namespace RimSynapse.Psychology.API
             comp.aversionRecurrence[domainKey] = count;
             bool permanent = count >= HardenAfterBreaks || (axisId != null && axisId.StartsWith("Synapse_Incapable_"));
 
-            string reason = permanent
+            string templated = permanent
                 ? $"After retreating from it again and again, {pawn.LabelShort}'s reluctance has set in for good."
                 : $"{pawn.LabelShort} is taking a couple of days away from this work.";
+            string reason = LlmReason(pawn, candidateId, templated); // LLM narration if the review pre-wrote it
 
             string applied = ApplyAxis(pawn, core, candidateId, reason);
             if (applied == null) return;
@@ -191,7 +194,7 @@ namespace RimSynapse.Psychology.API
                 });
             }
             RimSynapse.SynapseLogger.Message(
-                $"[RimSynapse] {pawn.LabelShort} WITHDREW from {applied} ({(permanent ? "PERMANENT — hardened" : "temporary break")}, recurrence {count}).", "performance");
+                $"[RimSynapse] {pawn.LabelShort} WITHDREW from {applied} ({(permanent ? "PERMANENT — hardened" : "temporary break")}, recurrence {count}) :: {reason}", "performance");
         }
 
         private static bool RegisterTempTrait(Pawn pawn, SynapsePawnComp comp, string traitDefName, int expiryTick,
@@ -231,6 +234,32 @@ namespace RimSynapse.Psychology.API
                 SynapsePsychology.ApplyTraitDirective(pawn, cs.traitDefName, false, "coping lifted");
                 comp.copingStates.Remove(cs);
             }
+        }
+
+        /// <summary>
+        /// Debug/test hook: resolve the top over-threshold candidate NOW (ignoring the daily roll) but
+        /// RESPECTING the LLM veto and narration — so the Phase 2 judge/narrate path can be exercised.
+        /// </summary>
+        public static string ForceResolve(Pawn pawn, SynapseCorePawnComp core)
+        {
+            if (pawn == null || core == null) return null;
+            float threshold = Settings?.shiftThreshold ?? 1.0f;
+            if (threshold <= 0f) threshold = 1f;
+            var over = core.traitPressures.Where(kv => kv.Value.pressure >= threshold).ToList();
+            if (over.Count == 0) return "nothing over threshold";
+
+            var aversions = over.Where(kv => IsAversionCandidate(kv.Key)).ToList();
+            if (aversions.Count > 0)
+            {
+                var t = aversions.OrderByDescending(kv => kv.Value.pressure).First();
+                if (IsVetoed(pawn, t.Key)) { DampenAndUnease(pawn, core, t.Key); return "VETOED " + t.Key; }
+                ApplyCoping(pawn, core, aversions);
+                return "coping";
+            }
+            var top = over.OrderByDescending(kv => kv.Value.pressure).First();
+            if (IsVetoed(pawn, top.Key)) { DampenAndUnease(pawn, core, top.Key); return "VETOED " + top.Key; }
+            FireShift(pawn, core, top.Key, top.Value);
+            return "shift " + top.Key;
         }
 
         /// <summary>Debug/test hook: force the crash-out coping now (ignoring the daily roll). Returns the style used.</summary>
@@ -283,6 +312,34 @@ namespace RimSynapse.Psychology.API
             if (core == null || core.moodBaseline < 0f) return 0f;
             float d = (todayMood - core.moodBaseline) / (scale <= 0f ? 0.15f : scale);
             return d > 1f ? 1f : (d < -1f ? -1f : d);
+        }
+
+        /// <summary>The LLM's pre-staged flavour for a candidate (Phase 2), or the templated fallback.</summary>
+        private static string LlmReason(Pawn pawn, string candidateId, string fallback)
+        {
+            var comp = pawn.TryGetComp<SynapsePawnComp>();
+            if (comp?.traitJudgments != null && comp.traitJudgments.TryGetValue(candidateId, out var j)
+                && !string.IsNullOrWhiteSpace(j.flavor))
+                return j.flavor;
+            return fallback;
+        }
+
+        /// <summary>True if the LLM judged this candidate out-of-character and the feedback loop is on.</summary>
+        private static bool IsVetoed(Pawn pawn, string candidateId)
+        {
+            if (Settings != null && !Settings.traitFeedbackEnabled) return false;
+            var comp = pawn.TryGetComp<SynapsePawnComp>();
+            return comp?.traitJudgments != null && comp.traitJudgments.TryGetValue(candidateId, out var j)
+                && j.verdict == "out_of_character";
+        }
+
+        /// <summary>The feedback loop: the LLM found a building change out of character — ease its pressure back.</summary>
+        private static void DampenAndUnease(Pawn pawn, SynapseCorePawnComp core, string candidateId)
+        {
+            if (core.traitPressures.TryGetValue(candidateId, out var tp)) tp.pressure *= 0.5f;
+            ApplyUnease(pawn, 1f);
+            RimSynapse.SynapseLogger.Message(
+                $"[RimSynapse] {pawn.LabelShort}: '{candidateId}' judged out-of-character by review — pressure eased back.", "performance");
         }
 
         private static bool RecentlyShifted(Pawn pawn)
@@ -348,11 +405,12 @@ namespace RimSynapse.Psychology.API
         {
             TraitAxis.TryParse(candidateId, out string axisId, out int targetDegree, out bool? singleAdd);
             var def = DefDatabase<TraitDef>.GetNamedSilentFail(axisId);
-            string reason = def != null ? BuildTemplatedReason(pawn, def, targetDegree, singleAdd) : "";
+            string templated = def != null ? BuildTemplatedReason(pawn, def, targetDegree, singleAdd) : "";
+            string reason = LlmReason(pawn, candidateId, templated); // LLM narration if the review pre-wrote it
             string applied = ApplyAxis(pawn, core, candidateId, reason);
             if (applied != null)
                 RimSynapse.SynapseLogger.Message(
-                    $"[RimSynapse] Trait shift fired for {pawn.LabelShort}: {candidateId} (pressure {tp.pressure:0.00}).", "performance");
+                    $"[RimSynapse] Trait shift fired for {pawn.LabelShort}: {candidateId} (pressure {tp.pressure:0.00}) :: {reason}", "performance");
         }
 
         private static string BuildTemplatedReason(Pawn pawn, TraitDef def, int targetDegree, bool? singleAdd)

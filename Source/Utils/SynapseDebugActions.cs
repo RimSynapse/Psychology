@@ -215,6 +215,68 @@ namespace RimSynapse.Psychology.Utils
             RimSynapse.SynapseLogger.Info("psychology", $"  => forced shift: {fired ?? "(nothing over threshold)"}");
         }
 
+        [DebugAction("RimSynapse", "Skill Engine: Force resolve now (respect veto/flavor)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ForceResolveNow(Pawn p)
+        {
+            var core = p?.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) return;
+            string r = RimSynapse.Psychology.API.SynapseTraitEngine.ForceResolve(p, core);
+            RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Force resolve for {p.LabelShort}: {r}");
+        }
+
+        [DebugAction("RimSynapse", "Skill Engine: Dump judgments (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void DumpJudgments(Pawn p)
+        {
+            var psych = p?.TryGetComp<SynapsePawnComp>();
+            if (psych?.traitJudgments == null || psych.traitJudgments.Count == 0)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p?.LabelShort} has no stored LLM trait judgments.");
+                return;
+            }
+            RimSynapse.SynapseLogger.Info("psychology", $"--- LLM judgments for {p.LabelShort} ---");
+            foreach (var kv in psych.traitJudgments)
+                RimSynapse.SynapseLogger.Info("psychology", $"  {kv.Key}: [{kv.Value.verdict}] {kv.Value.flavor}");
+        }
+
+        private static string TopCandidate(SynapseCorePawnComp core)
+        {
+            string top = null; float best = -1f;
+            if (core?.traitPressures != null)
+                foreach (var kv in core.traitPressures)
+                    if (kv.Value.pressure > best) { best = kv.Value.pressure; top = kv.Key; }
+            return top;
+        }
+
+        [DebugAction("RimSynapse", "Skill Engine: Inject LLM flavor on top candidate (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void InjectJudgmentFlavor(Pawn p)
+        {
+            var core = p?.TryGetComp<SynapseCorePawnComp>();
+            var psych = p?.TryGetComp<SynapsePawnComp>();
+            string top = TopCandidate(core);
+            if (top == null || psych == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse] No candidate to judge."); return; }
+            psych.traitJudgments[top] = new RimSynapse.Psychology.Models.TraitJudgmentRecord
+            {
+                verdict = "in_character",
+                flavor = $"Something in {p.LabelShort} has quietly given way; the overseer would do well to notice.",
+                tick = Find.TickManager.TicksGame
+            };
+            RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Injected in-character flavor on '{top}' for {p.LabelShort}. Fire a shift to see it in the letter.");
+        }
+
+        [DebugAction("RimSynapse", "Skill Engine: Inject VETO on top candidate (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void InjectJudgmentVeto(Pawn p)
+        {
+            var core = p?.TryGetComp<SynapseCorePawnComp>();
+            var psych = p?.TryGetComp<SynapsePawnComp>();
+            string top = TopCandidate(core);
+            if (top == null || psych == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse] No candidate to judge."); return; }
+            psych.traitJudgments[top] = new RimSynapse.Psychology.Models.TraitJudgmentRecord
+            {
+                verdict = "out_of_character", flavor = "", tick = Find.TickManager.TicksGame
+            };
+            RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Injected OUT-OF-CHARACTER veto on '{top}' for {p.LabelShort}. It should be pushed back at the rest edge.");
+        }
+
         [DebugAction("RimSynapse", "Skill Engine: Lift coping now (serve/expire)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void LiftCopingNow(Pawn p)
         {
