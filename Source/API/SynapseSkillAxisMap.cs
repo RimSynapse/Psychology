@@ -44,6 +44,8 @@ namespace RimSynapse.Psychology.API
         public const string Industriousness = "Industriousness";
         public const string Nerves = "Nerves";
         public const string Bloodlust = "Bloodlust";
+        public const string Kind = "Kind";
+        public const string Abrasive = "Abrasive";
         public const string Greedy = "Greedy";
         public const string Jealous = "Jealous";
         public const string Ascetic = "Ascetic";
@@ -170,6 +172,13 @@ namespace RimSynapse.Psychology.API
                 else if (negR > 0f)
                     AddSpectrum(pawn, signals, NaturalMood, positive: false, 0.20f * negR, "shaken by the violence they did");
             }
+
+            // ── S1/S2: social tone × the pawn's mood response (Kind / Abrasive) ──────
+            SynapseCorePawnComp.GetSocialToneToday(pawn, out int socialPos, out int socialNeg);
+            if (socialPos >= 2 && posR > 0f)
+                AddSingle(pawn, signals, Kind, add: true, 0.20f * posR, "warm and sociable, and glad of it");
+            if (socialNeg >= 2 && posR > 0f)
+                AddSingle(pawn, signals, Abrasive, add: true, 0.25f * posR, "harsh with others, and untroubled by it");
 
             // ── F1: fixation (only under genuine strain) → two opposing poles ─────────
             AddFixationSignals(pawn, strongPassions, signals, S, negR);

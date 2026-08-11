@@ -54,11 +54,12 @@ namespace RimSynapse.Psychology.Utils
             if (core == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.Name} has no SynapseCorePawnComp."); return; }
 
             core.GetActivityMetrics(out float idle, out float violence);
+            SynapseCorePawnComp.GetSocialToneToday(p, out int sPos, out int sNeg);
             float todayMood = p.needs?.mood?.CurLevelPercentage ?? 0.5f;
             float reinf = RimSynapse.Psychology.API.SynapseTraitEngine.PeekReinforcement(core, todayMood);
             float stress = RimSynapse.Psychology.API.SynapseTraitEngine.ComputeStress(p, todayMood);
             RimSynapse.SynapseLogger.Info("psychology",
-                $"--- Skill signals for {p.LabelShort} --- mood={todayMood:P0} baseline={core.moodBaseline:0.00} reinforcement={reinf:+0.00;-0.00} stress={stress:0.00} idle={idle:P0} livingViolence={violence:P0}");
+                $"--- Skill signals for {p.LabelShort} --- mood={todayMood:P0} baseline={core.moodBaseline:0.00} reinforcement={reinf:+0.00;-0.00} stress={stress:0.00} idle={idle:P0} livingViolence={violence:P0} social=+{sPos}/-{sNeg}");
             if (p.skills?.skills != null)
                 foreach (var rec in p.skills.skills.Where(r => r.passion != RimWorld.Passion.None || r.xpSinceMidnight > 0f))
                     RimSynapse.SynapseLogger.Info("psychology", $"  skill {rec.def.defName} L{rec.Level} passion={rec.passion} xpToday={rec.xpSinceMidnight:0}");
