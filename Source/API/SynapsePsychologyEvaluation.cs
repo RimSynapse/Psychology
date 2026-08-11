@@ -96,7 +96,7 @@ namespace RimSynapse.Psychology.API
             return sb.ToString().TrimEnd();
         }
 
-        private static string DescribeCandidate(Pawn pawn, string candidateId)
+        public static string DescribeCandidate(Pawn pawn, string candidateId)
         {
             if (!RimSynapse.Models.TraitAxis.TryParse(candidateId, out string axisId, out int deg, out bool? single))
                 return candidateId;

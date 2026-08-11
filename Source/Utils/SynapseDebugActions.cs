@@ -246,6 +246,13 @@ namespace RimSynapse.Psychology.Utils
             RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Force resolve for {p.LabelShort}: {r}");
         }
 
+        [DebugAction("RimSynapse", "Skill Engine: Open psychology window (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void OpenPsychologyWindow(Pawn p)
+        {
+            if (p == null) return;
+            Find.WindowStack.Add(new RimSynapse.Psychology.UI.Dialog_PawnPsychology(p));
+        }
+
         [DebugAction("RimSynapse", "Skill Engine: Dump personality (LLM + Core baseline)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpPersonality(Pawn p)
         {

@@ -85,6 +85,18 @@ namespace RimSynapse.Psychology.UI
             }
             totalFormHeight += 50f; // Extra for personality summary
             totalFormHeight += 70f; // Headline + warning badges (#psych-eval rework)
+
+            // Live "Forming Traits" trajectory (the engine's building-changes picture).
+            var traj = BuildTrajectory(coreComp, pawnComp);
+            float trajHeight = 44f; // header + coping-style line
+            foreach (var e in traj)
+            {
+                trajHeight += 22f;
+                if (!string.IsNullOrEmpty(e.flavor)) trajHeight += Text.CalcHeight(e.flavor, rect.width - 40f) + 4f;
+            }
+            if (pawnComp.copingStates != null) trajHeight += pawnComp.copingStates.Count * 20f;
+            trajHeight += (traj.Count == 0 ? 22f : 0f) + 20f;
+            totalFormHeight += trajHeight;
             
             // Calculate Patient History height
             var historyMemories = coreComp.memories.Where(m => m.tags != null && m.tags.Contains("TraitShift")).OrderBy(m => m.absTick).ToList();
@@ -141,6 +153,54 @@ namespace RimSynapse.Psychology.UI
             DrawEvalBadge(new Rect(0f, formY, badgeW, 24f), "Mood", $"{moodTxt} ({moodPct.ToStringPercent()})", moodCol);
             DrawEvalBadge(new Rect(badgeW + 10f, formY, badgeW, 24f), "Trait shift", shiftTxt, shiftCol);
             formY += 34f;
+
+            // === Forming Traits (live engine trajectory) ===
+            GUI.color = new Color(0.7f, 0.9f, 1f);
+            Widgets.Label(new Rect(rect.x, formY, viewRect.width, 22f), "<b>Forming Traits</b>");
+            GUI.color = Color.white;
+            formY += 22f;
+            {
+                bool confronts = RimSynapse.Psychology.API.SynapseTraitEngine.Confronts(pawn);
+                Text.Font = GameFont.Tiny;
+                GUI.color = new Color(0.7f, 0.7f, 0.7f);
+                Widgets.Label(new Rect(rect.x, formY, viewRect.width, 18f),
+                    $"Under strain: {(confronts ? "confronts problems (strikes against drudge work)" : "avoids problems (withdraws from hard work)")}");
+                GUI.color = Color.white; Text.Font = GameFont.Small;
+                formY += 22f;
+            }
+            if (traj.Count == 0)
+            {
+                GUI.color = new Color(0.7f, 0.7f, 0.7f);
+                Widgets.Label(new Rect(rect.x, formY, viewRect.width, 20f), "Nothing forming right now.");
+                GUI.color = Color.white;
+                formY += 22f;
+            }
+            else foreach (var e in traj)
+            {
+                Widgets.Label(new Rect(rect.x, formY, viewRect.width - 60f, 20f), e.text);
+                Rect bar = new Rect(rect.x + viewRect.width - 55f, formY + 4f, 50f, 11f);
+                Widgets.DrawBoxSolid(bar, new Color(0.18f, 0.18f, 0.18f));
+                Widgets.DrawBoxSolid(new Rect(bar.x, bar.y, bar.width * e.frac, bar.height), e.col);
+                formY += 22f;
+                if (!string.IsNullOrEmpty(e.flavor))
+                {
+                    GUI.color = new Color(0.72f, 0.72f, 0.72f); Text.Font = GameFont.Tiny;
+                    float fh = Text.CalcHeight(e.flavor, viewRect.width - 24f);
+                    Widgets.Label(new Rect(rect.x + 14f, formY, viewRect.width - 24f, fh), e.flavor);
+                    Text.Font = GameFont.Small; GUI.color = Color.white;
+                    formY += fh + 4f;
+                }
+            }
+            if (pawnComp.copingStates != null)
+                foreach (var cs in pawnComp.copingStates)
+                {
+                    GUI.color = new Color(0.82f, 0.60f, 0.15f);
+                    Widgets.Label(new Rect(rect.x, formY, viewRect.width, 20f), $"● On {cs.label}: {cs.traitDefName}");
+                    GUI.color = Color.white;
+                    formY += 20f;
+                }
+            Widgets.DrawLineHorizontal(rect.x, formY, viewRect.width);
+            formY += 10f;
 
             // Personality Summary
             if (!string.IsNullOrEmpty(coreComp.personalitySummary))
@@ -213,6 +273,29 @@ namespace RimSynapse.Psychology.UI
             Widgets.DrawLineHorizontal(rect.x, formY, viewRect.width);
             
             Widgets.EndScrollView();
+        }
+
+        private struct TrajEntry { public string text; public string flavor; public float frac; public Color col; }
+
+        /// <summary>The engine's live building-changes picture for the Forming Traits section.</summary>
+        private System.Collections.Generic.List<TrajEntry> BuildTrajectory(RimSynapse.Comps.SynapseCorePawnComp cc, SynapsePawnComp pc)
+        {
+            var list = new System.Collections.Generic.List<TrajEntry>();
+            if (cc?.traitPressures == null) return list;
+            float threshold = RimSynapse.Psychology.RimSynapsePsychologyMod.Settings?.shiftThreshold ?? 1f;
+            if (threshold <= 0f) threshold = 1f;
+            foreach (var kvp in cc.traitPressures.OrderByDescending(k => k.Value.pressure))
+            {
+                if (kvp.Value.pressure < 0.3f) continue;
+                float frac = Mathf.Clamp01(kvp.Value.pressure / threshold);
+                string desc = RimSynapse.Psychology.API.SynapsePsychology.DescribeCandidate(pawn, kvp.Key);
+                string flavor = null, verdict = null;
+                if (pc?.traitJudgments != null && pc.traitJudgments.TryGetValue(kvp.Key, out var j)) { flavor = j.flavor; verdict = j.verdict; }
+                string vtag = verdict == "out_of_character" ? "  (judged out of character)" : "";
+                Color col = frac >= 1f ? new Color(0.82f, 0.60f, 0.15f) : new Color(0.45f, 0.7f, 0.95f);
+                list.Add(new TrajEntry { text = $"{desc} — {(int)(frac * 100f)}%{vtag}", flavor = flavor, frac = frac, col = col });
+            }
+            return list;
         }
 
         private static void DrawEvalBadge(Rect r, string label, string value, Color color)
