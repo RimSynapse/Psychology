@@ -59,23 +59,24 @@ namespace RimSynapse.Psychology.API
             public string workTypeDef;
             public string aversionTraitDef;   // graduated distaste spectrum (degrees 1..2)
             public string incapableTraitDef;  // rare terminal: disables the work type
-            public WorkDomain(string skill, string workType, string aversion, string incapable)
-            { skillDef = skill; workTypeDef = workType; aversionTraitDef = aversion; incapableTraitDef = incapable; }
+            public string devotionTraitDef;   // graduated devotion spectrum (degrees 1..2) — the positive mirror
+            public WorkDomain(string skill, string workType, string aversion, string incapable, string devotion)
+            { skillDef = skill; workTypeDef = workType; aversionTraitDef = aversion; incapableTraitDef = incapable; devotionTraitDef = devotion; }
         }
 
         public static readonly List<WorkDomain> WorkDomains = new List<WorkDomain>
         {
-            new WorkDomain("Intellectual", "Research",     "Synapse_Aversion_Intellectual", "Synapse_Incapable_Intellectual"),
-            new WorkDomain("Plants",       "Growing",      "Synapse_Aversion_Plants",       "Synapse_Incapable_Plants"),
-            new WorkDomain("Crafting",     "Crafting",     "Synapse_Aversion_Crafting",     "Synapse_Incapable_Crafting"),
-            new WorkDomain("Shooting",     "Hunting",      "Synapse_Aversion_Violent",      "Synapse_Incapable_Violent"),
-            new WorkDomain("Melee",        "Hunting",      "Synapse_Aversion_Violent",      "Synapse_Incapable_Violent"),
-            new WorkDomain("Social",       "Warden",       "Synapse_Aversion_Social",       "Synapse_Incapable_Social"),
-            new WorkDomain("Mining",       "Mining",       "Synapse_Aversion_Mining",       "Synapse_Incapable_Mining"),
-            new WorkDomain("Cooking",      "Cooking",      "Synapse_Aversion_Cooking",      "Synapse_Incapable_Cooking"),
-            new WorkDomain("Artistic",     "Art",          "Synapse_Aversion_Artistic",     "Synapse_Incapable_Artistic"),
-            new WorkDomain("Animals",      "Handling",     "Synapse_Aversion_Animals",      "Synapse_Incapable_Animals"),
-            new WorkDomain("Construction", "Construction", "Synapse_Aversion_Construction", "Synapse_Incapable_Construction"),
+            new WorkDomain("Intellectual", "Research",     "Synapse_Aversion_Intellectual", "Synapse_Incapable_Intellectual", "Synapse_Devotion_Intellectual"),
+            new WorkDomain("Plants",       "Growing",      "Synapse_Aversion_Plants",       "Synapse_Incapable_Plants",       "Synapse_Devotion_Plants"),
+            new WorkDomain("Crafting",     "Crafting",     "Synapse_Aversion_Crafting",     "Synapse_Incapable_Crafting",     "Synapse_Devotion_Crafting"),
+            new WorkDomain("Shooting",     "Hunting",      "Synapse_Aversion_Violent",      "Synapse_Incapable_Violent",      "Synapse_Devotion_Violent"),
+            new WorkDomain("Melee",        "Hunting",      "Synapse_Aversion_Violent",      "Synapse_Incapable_Violent",      "Synapse_Devotion_Violent"),
+            new WorkDomain("Social",       "Warden",       "Synapse_Aversion_Social",       "Synapse_Incapable_Social",       "Synapse_Devotion_Social"),
+            new WorkDomain("Mining",       "Mining",       "Synapse_Aversion_Mining",       "Synapse_Incapable_Mining",       "Synapse_Devotion_Mining"),
+            new WorkDomain("Cooking",      "Cooking",      "Synapse_Aversion_Cooking",      "Synapse_Incapable_Cooking",      "Synapse_Devotion_Cooking"),
+            new WorkDomain("Artistic",     "Art",          "Synapse_Aversion_Artistic",     "Synapse_Incapable_Artistic",     "Synapse_Devotion_Artistic"),
+            new WorkDomain("Animals",      "Handling",     "Synapse_Aversion_Animals",      "Synapse_Incapable_Animals",      "Synapse_Devotion_Animals"),
+            new WorkDomain("Construction", "Construction", "Synapse_Aversion_Construction", "Synapse_Incapable_Construction", "Synapse_Devotion_Construction"),
         };
 
         public static WorkDomain DomainForSkill(string skillDefName)
@@ -136,8 +137,13 @@ namespace RimSynapse.Psychology.API
                 strongPassions.Add(rec);
                 float scale = PassionScale(rec.passion);
                 if (rec.xpSinceMidnight >= PracticeXp && posR > 0f)
+                {
                     AddSpectrum(pawn, signals, NaturalMood, positive: true, 0.30f * scale * posR,
                         $"fulfilled passion {rec.def.label} + lifted mood");
+                    // The min-max loop: doing what they love well AND feeling it grows a real gift.
+                    EmitDevotion(pawn, signals, DomainForSkill(rec.def.defName), 0.25f * scale * posR,
+                        $"pouring themselves into {rec.def.label}");
+                }
                 else if (rec.xpSinceMidnight < IdleXp && S > 0f)
                     AddSpectrum(pawn, signals, NaturalMood, positive: false, 0.35f * scale * S,
                         $"starved passion {rec.def.label} under strain");
@@ -229,6 +235,14 @@ namespace RimSynapse.Psychology.API
         /// degree — does continued pressure push toward the rare terminal INCAPABLE trait, at a reduced weight
         /// so it takes far longer to reach. A binary "suddenly can't work" is thus the exception, not the rule.
         /// </summary>
+        /// <summary>Move the pawn up the graduated DEVOTION spectrum for a work domain (keen -> devoted).</summary>
+        private static void EmitDevotion(Pawn pawn, List<SkillSignal> signals, WorkDomain domain, float weight, string reason)
+        {
+            if (domain?.devotionTraitDef == null || weight <= 0f) return;
+            if (DefDatabase<TraitDef>.GetNamedSilentFail(domain.devotionTraitDef) == null) return;
+            AddSpectrum(pawn, signals, domain.devotionTraitDef, positive: true, weight, reason);
+        }
+
         private static void EmitAversion(Pawn pawn, List<SkillSignal> signals, WorkDomain domain, float weight, string reason)
         {
             if (domain?.aversionTraitDef == null || weight <= 0f) return;

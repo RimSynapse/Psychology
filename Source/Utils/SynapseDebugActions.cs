@@ -192,6 +192,27 @@ namespace RimSynapse.Psychology.Utils
                     RimSynapse.SynapseLogger.Info("psychology", $"     active {cs.label}: {cs.traitDefName}{(cs.conditionSkillDefName != null ? " until " + cs.conditionSkillDefName : "")}");
         }
 
+        [DebugAction("RimSynapse", "Skill Engine: Simulate 12 devotion days (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void SimulateDevotionArc(Pawn p)
+        {
+            if (p == null || p.skills == null) return;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) return;
+            var plants = p.skills.GetSkill(SkillDefOf.Plants);
+            if (plants != null) plants.passion = RimWorld.Passion.Major;
+            core.moodBaseline = 0.5f; // a happy day (0.72) reads as a real lift -> positive reinforcement
+            for (int day = 1; day <= 12; day++)
+            {
+                if (plants != null) plants.xpSinceMidnight = 2000f; // poured themselves into their passion
+                RimSynapse.Psychology.API.SynapseTraitEngine.ProcessRestEdge(p, core, 0.72f);
+            }
+            RimSynapse.SynapseLogger.Info("psychology", $"--- Devotion arc for {p.LabelShort} (12 fulfilled, happy days) ---");
+            foreach (var kv in core.traitPressures.OrderByDescending(k => k.Value.pressure))
+                RimSynapse.SynapseLogger.Info("psychology", $"  {kv.Key} = {kv.Value.pressure:0.00} (peak {kv.Value.peak:0.00})");
+            string fired = RimSynapse.Psychology.API.SynapseTraitEngine.ForceTopShift(p, core);
+            RimSynapse.SynapseLogger.Info("psychology", $"  => forced shift: {fired ?? "(nothing over threshold)"}");
+        }
+
         [DebugAction("RimSynapse", "Skill Engine: Simulate 12 bloodlust days (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void SimulateBloodlustArc(Pawn p)
         {
@@ -335,7 +356,7 @@ namespace RimSynapse.Psychology.Utils
             psych?.aversionRecurrence?.Clear();
             // Strip any engine-applied aversion / incapable / strike traits so a scenario can be re-run cleanly.
             var toClear = new System.Collections.Generic.List<string> { "Synapse_Strike_Hauling", "Synapse_Strike_Cleaning" };
-            foreach (var d in SynapseSkillAxisMap.WorkDomains) { toClear.Add(d.aversionTraitDef); toClear.Add(d.incapableTraitDef); }
+            foreach (var d in SynapseSkillAxisMap.WorkDomains) { toClear.Add(d.aversionTraitDef); toClear.Add(d.incapableTraitDef); toClear.Add(d.devotionTraitDef); }
             foreach (var defName in toClear)
             {
                 var def = DefDatabase<TraitDef>.GetNamedSilentFail(defName);
