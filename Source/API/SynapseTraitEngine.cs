@@ -42,18 +42,19 @@ namespace RimSynapse.Psychology.API
             float reinforcement = core.UpdateMoodBaselineAndGetReinforcement(todayMood);
             float stress = ComputeStress(pawn, todayMood);
             var signals = SynapseSkillAxisMap.SampleSignals(pawn, core, reinforcement, stress);
+            float mult = Settings?.traitDriftMultiplier ?? 1f; // master "how fast personalities drift" knob
             foreach (var sig in signals)
             {
                 string axisId = TraitAxis.AxisIdOf(sig.candidateId);
                 float resistance = SynapseTraitPolicy.ResistanceFactor(axisId);
                 // Ungated on purpose: measured evidence drives accumulation, not the model's confidence.
-                core.AccumulateTraitPressure(sig.candidateId, sig.dailyPressure, sig.direction, resistance, nowAbs, decay);
+                core.AccumulateTraitPressure(sig.candidateId, sig.dailyPressure * mult, sig.direction, resistance, nowAbs, decay);
             }
 
             ResolveEscalation(pawn, core);
         }
 
-        private const int HardenAfterBreaks = 3;   // repeated breaks on one domain before it hardens permanent
+        private static int HardenAfterBreaks => Settings?.hardenAfterBreaks ?? 3; // repeated breaks before permanent
 
         private static void ResolveEscalation(Pawn pawn, SynapseCorePawnComp core)
         {

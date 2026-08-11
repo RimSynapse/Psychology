@@ -34,7 +34,7 @@ namespace RimSynapse.Psychology.API
     public static class SynapseSkillAxisMap
     {
         // ── Tuning knobs (Phase 3 will expose these as settings) ──────────────────────────
-        public const float PracticeXp = 800f;   // xpSinceMidnight at/above which a passion counts "fulfilled"
+        public static float PracticeXp => RimSynapse.Psychology.RimSynapsePsychologyMod.Settings?.practiceXpThreshold ?? 800f; // xpSinceMidnight at/above which a passion counts "fulfilled"
         public const float IdleXp = 50f;         // xpSinceMidnight below which a skill counts "untouched today"
         public const int ExpertLevel = 10;       // level at/above which disuse causes rust
         public const float RustCapPerDay = 0.40f;

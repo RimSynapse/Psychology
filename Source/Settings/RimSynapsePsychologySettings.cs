@@ -15,6 +15,9 @@ namespace RimSynapse.Psychology.Settings
         public float copingChancePerDay = 0.15f;        // once at threshold on a work-stressor, daily chance a temporary coping (strike/break) fires
         public int aversionBreakDays = 2;               // how long a temporary break/strike lasts before timing out
         public bool traitFeedbackEnabled = true;        // LLM "out_of_character" verdict pushes back on a building change (feedback loop)
+        public float traitDriftMultiplier = 1.0f;       // global scale on ALL measured signal pressure — the master "how fast do personalities drift" knob
+        public float practiceXpThreshold = 800f;        // daily skill XP at/above which a passion counts "fulfilled"
+        public int hardenAfterBreaks = 3;               // repeated withdrawals on one work before a break hardens into a permanent aversion
         public float consolidationThreshold = 1.0f;    // salience needed to consolidate a memory long-term
         public int referenceThreshold = 3;             // reference count that consolidates a memory
         public float abandonmentThreshold = 90f;       // AbandonmentRiskScore above which a pawn may leave
@@ -31,6 +34,12 @@ namespace RimSynapse.Psychology.Settings
             Scribe_Values.Look(ref shiftThreshold, "shiftThreshold", 1.0f);
             Scribe_Values.Look(ref shiftPressureDecay, "shiftPressureDecay", 0.2f);
             Scribe_Values.Look(ref traitShiftChancePerDay, "traitShiftChancePerDay", 0.005f);
+            Scribe_Values.Look(ref copingChancePerDay, "copingChancePerDay", 0.15f);
+            Scribe_Values.Look(ref aversionBreakDays, "aversionBreakDays", 2);
+            Scribe_Values.Look(ref traitFeedbackEnabled, "traitFeedbackEnabled", true);
+            Scribe_Values.Look(ref traitDriftMultiplier, "traitDriftMultiplier", 1.0f);
+            Scribe_Values.Look(ref practiceXpThreshold, "practiceXpThreshold", 800f);
+            Scribe_Values.Look(ref hardenAfterBreaks, "hardenAfterBreaks", 3);
             Scribe_Values.Look(ref consolidationThreshold, "consolidationThreshold", 1.0f);
             Scribe_Values.Look(ref referenceThreshold, "referenceThreshold", 3);
             Scribe_Values.Look(ref abandonmentThreshold, "abandonmentThreshold", 90f);
