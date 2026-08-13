@@ -48,6 +48,12 @@ namespace RimSynapse.Psychology
             
             // Register with Core
             ModHandle = SynapseCore.Register("RimSynapsePsychology", "RimSynapse Psychology");
+
+            // Cross-mod compatibility (Core #91 slice 2): declare the Core API contract this build
+            // needs and register our facts into Core's runtime registry — by reflection, so an old
+            // Core can't crash the probe. Sets PsychologyCompat.IsCoreCompatible for graceful degrade.
+            PsychologyCompat.RegisterAndProbe(new[] { "psychology" });
+
             API.SynapsePsychologyTools.RegisterTools();
             SynapseToolRegistry.CustomBreakHandler = API.SynapsePsychologyTools.HandleCustomBreak;
             
