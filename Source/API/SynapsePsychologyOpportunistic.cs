@@ -368,9 +368,12 @@ You MUST respond strictly in valid JSON format:
             string burdensA = compA != null ? compA.GetTopMemoryBurdens(3, 0.5f) : "None";
             string burdensB = compB != null ? compB.GetTopMemoryBurdens(3, 0.5f) : "None";
 
+            // #26: named injection point — fires for the primary pawn (whose perspective this memory is).
+            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawnA, RimSynapse.SynapseContextTypes.RelationshipEvaluation);
+
             string userMessage = $"Your Name: {pawnA.Name.ToStringShort} (Gender: {pawnA.gender})\nYour Traits: {pawnA.story?.traits?.allTraits.Select(t => t.Label).ToCommaList() ?? "None"}\nYour Burdens: {burdensA}\n\n" +
                                  $"Their Name: {pawnB.Name.ToStringShort} (Gender: {pawnB.gender})\nTheir Traits: {pawnB.story?.traits?.allTraits.Select(t => t.Label).ToCommaList() ?? "None"}\nTheir Burdens: {burdensB}\n\n" +
-                                 $"Familiarity (0-100): {sharedRecord.familiarity:F0}\nTrust (-100 to 100): {sharedRecord.trust:F0}";
+                                 $"Familiarity (0-100): {sharedRecord.familiarity:F0}\nTrust (-100 to 100): {sharedRecord.trust:F0}{crossModContext}";
 
             var options = new ChatOptions { priority = 3, requestName = "Relationship Evaluation", targetName = $"{pawnA.Name.ToStringShort} -> {pawnB.Name.ToStringShort}" };
 

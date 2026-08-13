@@ -295,6 +295,9 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
             // Phase 2: the judge/narrate candidate picture (ids the model must copy back).
             systemPrompt = systemPrompt.Replace("{TRAIT_CANDIDATES}", DescribeTraitCandidatesForPrompt(pawn, coreComp));
 
+            // #26: named injection point — let other mods add context to the nightly clinical review.
+            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.DailyReview);
+
             string userMessage = $@"Patient Name: {pawn.Name.ToStringShort}
 Gender: {pawn.gender}
 Status: {statusText}
@@ -308,7 +311,7 @@ Current Social Network (Trust, Familiarity, Affinity):
 {socialNetworkStr}
 Today's Activity (deduped, with target kinds): {todaysActivity}
 Today's Events:
-{recentEvents}";
+{recentEvents}{crossModContext}";
 
             var options = new ChatOptions { priority = isOpportunistic ? -1 : 0, requestName = "Daily Psychology Review", targetName = pawn.Name.ToStringShort };
 

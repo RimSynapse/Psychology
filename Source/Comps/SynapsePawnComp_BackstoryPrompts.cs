@@ -36,7 +36,7 @@ namespace RimSynapse.Psychology.Comps
             }
             
             // Allow Core/Factions to inject extra context (like Ideology)
-            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, "BackstoryChildhood");
+            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.BackstoryChildhood);
 
             string systemPrompt = @"You are writing a vivid third-person memory for a colonist in the RimWorld universe, as if the AI Storyteller is describing their childhood.
 This memory is from their CHILDHOOD. It should be a specific, concrete scene — not a summary.
@@ -158,7 +158,7 @@ Write a vivid childhood memory grounded in these skills.";
                 : "";
                 
             // Allow Core/Factions to inject extra context
-            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, "BackstoryAdulthood");
+            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.BackstoryAdulthood);
 
             string systemPrompt = @"You are writing a vivid third-person memory for a colonist in the RimWorld universe, as if the AI Storyteller is describing their adulthood.
 This memory is from their ADULTHOOD. It should be a specific, concrete scene — not a summary.
@@ -263,7 +263,7 @@ Write a vivid adulthood memory grounded in these skills.";
             if (adulthoodMem != null) memoriesContext += $"Adulthood Memory:\n\"{adulthoodMem.summary}\"\n\n";
             
             // Allow Core/Factions to inject extra context
-            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, "PersonalityProfile");
+            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.PersonalityProfile);
 
             string systemPrompt = @"You are analyzing the psychology of a RimWorld colonist based on their life memories.
 Given their childhood memory, adulthood memory, and current personality traits, synthesize a psychological profile.
