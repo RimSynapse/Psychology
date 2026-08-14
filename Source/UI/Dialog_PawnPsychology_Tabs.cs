@@ -373,7 +373,7 @@ namespace RimSynapse.Psychology.UI
                             ? $"Adulthood: {title.CapitalizeFirst()}" 
                             : "Adulthood Backstory";
                     }
-                    else if (memory.memoryType == "Arrival" || memory.memoryType == "ArrivalFirstImpression") sourceLabel = Find.Scenario?.name ?? "Scenario Start";
+                    else if (memory.memoryType == "Arrival" || memory.memoryType == "ArrivalFirstImpression" || memory.memoryType == "BackstoryArrival") sourceLabel = Find.Scenario?.name ?? "Scenario Start";
                     else if (memory.memoryType == "social" || memory.memoryType == "social_chat") sourceLabel = "Conversation";
                     else if (memory.memoryType == "non_response") sourceLabel = "Ignored Dialogue";
                     else if (memory.memoryType == "funeral" || memory.memoryType == "Funeral") sourceLabel = "Funeral Ceremony";

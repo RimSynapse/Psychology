@@ -348,17 +348,10 @@ Synthesize their psychological profile.";
 
                             if (parsed.TryGetValue("FirstImpression", out object impression))
                             {
-                                coreComp.AddMemory(new WeightedMemory
-                                {
-                                    summary = impression.ToString(),
-                                    weight = 0.6f,
-                                    baseWeight = 0.6f,
-                                    decayRate = 0.005f,
-                                    tags = new List<string> { "Arrival", "FirstImpression" },
-                                    memoryType = "Arrival",
-                                    absTick = SynapseDateHelper.GetAdjustmentTick(),
-                                    gameTick = 0
-                                });
+                                // #22: the arrival first-impression is a defining memory — plant it through
+                                // the contract so it is secured (long-term) and its tags seed resonance.
+                                RimSynapse.Psychology.API.SynapsePsychology.PlantDefiningMemory(
+                                    pawn, impression.ToString(), new List<string> { "Arrival", "FirstImpression" });
                             }
 
                             BuildDynamicBackstory(pawn, coreComp);
