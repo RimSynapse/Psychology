@@ -1,5 +1,5 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
-[b]Version:[/b] v0.7.1 (Target: RimWorld 1.6)
+[b]Version:[/b] v0.8.0 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Psychology[/h1]
 [b][url=https://github.com/RimSynapse/Psychology/wiki]Official Wiki and Documentation[/url][/b]
@@ -25,13 +25,24 @@ Breathe genuine psychological depth into your colonists. RimSynapse Psychology r
 
 [h2]Roadmap[/h2]
 [list]
-[*] [b]0.8 - Demographics, News and Narrative Voice:[/b] Nightly clinical reviews moved onto Core's shared deadline batch, a backstory-arrival memory contract, and context hooks that let other modules and faction leaders read a colonist's psychology.
 [*] [b]0.9 - Factions and Living Societies:[/b] Living social dynamics - colony cliques and a rumour mill, familiarity-milestone events, a trait-history timeline and social-network view, and auto-running therapy sessions (with Conversations).
 [*] [b]0.10 - Cross-Mod Capability Passes:[/b] Another pass over how psychology feeds factions, news and narration across the suite.
 [/list]
 These ship when they are ready - no dates.
 
 ---
+
+[h2]Changelog (v0.8.0) - Living Traits, Voice and Clinical Insight[/h2]
+[list]
+[*] NEW - Living traits: a colonist's personality now drifts from what they actually do and live through, weighed by an LLM judge and narrated back to you, with a feedback loop that learns as it goes.
+[*] NEW - Kindness and abrasiveness now register as social signals, feeding new affinity and devotion between colonists - and pawns pushed past their limits develop graduated aversions and their own ways of coping.
+[*] NEW - "Forming Traits" view: the pawn's Psychology window now shows which traits are drifting and where they are heading, with new sliders in mod settings to tune how fast personalities change.
+[*] NEW - Pawn Voice: Psychology now writes each colonist's narrative voice - their turn of phrase plus a spoken Kokoro voice - so they sound like themselves.
+[*] NEW - Colonists now form a memory of the day they arrived, and Psychology plugs into Core 0.8's shared context hooks so other modules can read a pawn's state.
+[*] Changed: the clinical evaluation is rebuilt into five dynamic sections with at-a-glance warning badges, and now covers only pawns affiliated with your colony.
+[*] Changed: episode narration only speaks up when a pawn was actually involved, uses the right pronouns, and runs as long as the moment deserves.
+[*] Performance: smoothed out the mental-break manager and trimmed hot-path costs for less stutter.
+[/list]
 
 [h2]Changelog (v0.7.1) - Gradual personality and smarter memory[/h2]
 [list]
