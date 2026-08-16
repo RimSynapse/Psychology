@@ -48,6 +48,12 @@ namespace RimSynapse.Psychology
             
             // Register with Core
             ModHandle = SynapseCore.Register("RimSynapsePsychology", "RimSynapse Psychology");
+
+            // Cross-mod compatibility (Core #91 slice 2): declare the Core API contract this build
+            // needs and register our facts into Core's runtime registry — by reflection, so an old
+            // Core can't crash the probe. Sets PsychologyCompat.IsCoreCompatible for graceful degrade.
+            PsychologyCompat.RegisterAndProbe(new[] { "psychology" });
+
             API.SynapsePsychologyTools.RegisterTools();
             SynapseToolRegistry.CustomBreakHandler = API.SynapsePsychologyTools.HandleCustomBreak;
             
@@ -142,6 +148,27 @@ namespace RimSynapse.Psychology
 
             listingStandard.Label($"Evaluation Cadence: every {Settings.evalCadence} day(s)", tooltip: "How often the nightly psychology evaluation runs per colonist. Higher = fewer LLM calls / lower token cost.");
             Settings.evalCadence = (int)listingStandard.Slider(Settings.evalCadence, 1f, 7f);
+
+            listingStandard.Label($"Trait Shift Chance: {(Settings.traitShiftChancePerDay * 100f):F1}% / day", tooltip: "Once behaviour has pushed trait pressure past the threshold, the daily chance a permanent trait shift actually fires. Below threshold the pawn only gets a growing 'unease' mood. Set to 0 to disable permanent shifts entirely (mood-only).");
+            Settings.traitShiftChancePerDay = listingStandard.Slider(Settings.traitShiftChancePerDay, 0f, 0.10f);
+
+            listingStandard.GapLine();
+            listingStandard.Label($"Personality Drift Speed: {Settings.traitDriftMultiplier:F2}x", tooltip: "Master knob scaling ALL measured personality-drift pressure. 1.0 = default; lower = personalities change more slowly, higher = faster. 0 effectively freezes drift.");
+            Settings.traitDriftMultiplier = listingStandard.Slider(Settings.traitDriftMultiplier, 0f, 3f);
+
+            listingStandard.Label($"Passion Fulfilment Threshold: {Settings.practiceXpThreshold:F0} XP/day", tooltip: "Daily skill XP a passionate pawn must earn for that passion to count as 'fulfilled'. Lower = passions satisfy more easily; higher = harder to keep a passionate pawn content.");
+            Settings.practiceXpThreshold = listingStandard.Slider(Settings.practiceXpThreshold, 200f, 2000f);
+
+            listingStandard.Label($"Work-Stressor Coping Chance: {(Settings.copingChancePerDay * 100f):F0}% / day", tooltip: "Once a work-stressor crash-out is at threshold, the daily chance the pawn copes (a confronter strikes / an avoider takes a break). These are temporary and reversible.");
+            Settings.copingChancePerDay = listingStandard.Slider(Settings.copingChancePerDay, 0f, 0.5f);
+
+            listingStandard.Label($"Break / Strike Length: {Settings.aversionBreakDays} day(s)", tooltip: "How long a temporary break or strike lasts before it times out (a strike also lifts early once the pawn gets to do their passion).");
+            Settings.aversionBreakDays = (int)listingStandard.Slider(Settings.aversionBreakDays, 1f, 7f);
+
+            listingStandard.Label($"Recurrences Before Permanent: {Settings.hardenAfterBreaks}", tooltip: "How many times the same work-stressor must recur (as temporary breaks) before it hardens into a permanent aversion.");
+            Settings.hardenAfterBreaks = (int)listingStandard.Slider(Settings.hardenAfterBreaks, 1f, 8f);
+
+            listingStandard.CheckboxLabeled("LLM personality feedback loop", ref Settings.traitFeedbackEnabled, "When on, the nightly review can judge a building change 'out of character' and ease its pressure back, keeping pawns true to who they are. When off, measured behaviour alone drives changes.");
 
             Settings.ApplyToCore();
 

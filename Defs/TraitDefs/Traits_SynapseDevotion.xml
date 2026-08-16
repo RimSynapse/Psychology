@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+  <!--
+    Skill-driven DEVOTION traits — the positive mirror of the aversion family. A pawn who gets to pour
+    themselves into a passion AND feels good doing it grows a real gift: a graduated, reversible work-speed
+    bonus (keen -> devoted). This is the reinforcing min-max loop with teeth — doing what you love well
+    makes you better at it, so you do it more. Grown via statFactors (live + reversible, like the aversion
+    penalties); commonality 0 (engine-assigned only).
+  -->
+
+  <TraitDef>
+    <defName>Synapse_Devotion_Intellectual</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li><degree>1</degree><label>keen thinker</label><description>{PAWN_nameDef} has found real purpose in intellectual work and throws {PAWN_objective}self into it.</description><statFactors><ResearchSpeed>1.15</ResearchSpeed></statFactors></li>
+      <li><degree>2</degree><label>devoted researcher</label><description>{PAWN_nameDef} lives for the work of the mind; the research bench is where {PAWN_pronoun} feels most alive.</description><statFactors><ResearchSpeed>1.35</ResearchSpeed></statFactors></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Devotion_Plants</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li><degree>1</degree><label>keen grower</label><description>{PAWN_nameDef} has found real joy in working the soil.</description><statFactors><PlantWorkSpeed>1.15</PlantWorkSpeed></statFactors></li>
+      <li><degree>2</degree><label>devoted grower</label><description>{PAWN_nameDef} lives for the fields; nothing settles {PAWN_objective} like tending growing things.</description><statFactors><PlantWorkSpeed>1.35</PlantWorkSpeed></statFactors></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Devotion_Crafting</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li><degree>1</degree><label>keen crafter</label><description>{PAWN_nameDef} takes real pride in what {PAWN_pronoun} makes.</description><statFactors><WorkSpeedGlobal>1.08</WorkSpeedGlobal></statFactors></li>
+      <li><degree>2</degree><label>devoted crafter</label><description>{PAWN_nameDef} pours {PAWN_objective}self into the craft, and it shows in the work.</description><statFactors><WorkSpeedGlobal>1.2</WorkSpeedGlobal></statFactors></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Devotion_Violent</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li><degree>1</degree><label>keen hunter</label><description>{PAWN_nameDef} has grown into the hunt with real relish.</description><statFactors><HuntingStealth>1.15</HuntingStealth></statFactors></li>
+      <li><degree>2</degree><label>devoted hunter</label><description>{PAWN_nameDef} is never so at ease as out on the hunt.</description><statFactors><HuntingStealth>1.35</HuntingStealth></statFactors></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Devotion_Social</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li><degree>1</degree><label>keen mediator</label><description>{PAWN_nameDef} has a growing gift for handling people.</description><statFactors><SocialImpact>1.15</SocialImpact></statFactors></li>
+      <li><degree>2</degree><label>devoted mediator</label><description>{PAWN_nameDef} thrives on the work of managing and persuading others.</description><statFactors><SocialImpact>1.35</SocialImpact></statFactors></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Devotion_Mining</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li><degree>1</degree><label>keen miner</label><description>{PAWN_nameDef} has taken to the rock with real drive.</description><statFactors><MiningSpeed>1.15</MiningSpeed></statFactors></li>
+      <li><degree>2</degree><label>devoted miner</label><description>{PAWN_nameDef} is happiest deep in the stone, chasing the next seam.</description><statFactors><MiningSpeed>1.35</MiningSpeed></statFactors></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Devotion_Cooking</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li><degree>1</degree><label>keen cook</label><description>{PAWN_nameDef} has found real satisfaction at the stove.</description><statFactors><CookSpeed>1.15</CookSpeed></statFactors></li>
+      <li><degree>2</degree><label>devoted cook</label><description>{PAWN_nameDef} lives to feed the colony well.</description><statFactors><CookSpeed>1.35</CookSpeed></statFactors></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Devotion_Artistic</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li><degree>1</degree><label>keen artist</label><description>{PAWN_nameDef} has found real voice in making art.</description><statFactors><WorkSpeedGlobal>1.08</WorkSpeedGlobal></statFactors></li>
+      <li><degree>2</degree><label>devoted artist</label><description>{PAWN_nameDef} pours {PAWN_possessive} soul into the work, and it shows.</description><statFactors><WorkSpeedGlobal>1.2</WorkSpeedGlobal></statFactors></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Devotion_Animals</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li><degree>1</degree><label>keen handler</label><description>{PAWN_nameDef} has grown a real bond with the animals.</description><statFactors><AnimalGatherSpeed>1.15</AnimalGatherSpeed></statFactors></li>
+      <li><degree>2</degree><label>devoted handler</label><description>{PAWN_nameDef} is never happier than among the animals.</description><statFactors><AnimalGatherSpeed>1.35</AnimalGatherSpeed></statFactors></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Devotion_Construction</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li><degree>1</degree><label>keen builder</label><description>{PAWN_nameDef} takes real pride in raising something lasting.</description><statFactors><ConstructionSpeed>1.15</ConstructionSpeed></statFactors></li>
+      <li><degree>2</degree><label>devoted builder</label><description>{PAWN_nameDef} lives to build, and the colony rises around {PAWN_objective}.</description><statFactors><ConstructionSpeed>1.35</ConstructionSpeed></statFactors></li>
+    </degreeDatas>
+  </TraitDef>
+
+</Defs>

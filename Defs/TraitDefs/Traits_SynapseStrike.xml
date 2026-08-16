@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+  <!--
+    Strike traits (RimSynapse trait engine, coping layer). A CONFRONTER under an unmet passion refuses the
+    low-priority drudge work as leverage — "I'm not hauling or cleaning until I get to research." Applied
+    TEMPORARILY with a lift condition (the starved passion finally gets exercised, or a timeout). These
+    disable Hauling / Cleaning via disabledWorkTypes; the engine removes them the moment the condition is met.
+    Commonality 0 (engine-assigned only).
+  -->
+
+  <TraitDef>
+    <defName>Synapse_Strike_Hauling</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Hauling</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>refusing to haul</label><description>{PAWN_nameDef} is refusing to haul until {PAWN_pronoun} gets to do the work that actually matters to {PAWN_objective}.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Strike_Cleaning</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Cleaning</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>refusing to clean</label><description>{PAWN_nameDef} is refusing to clean until {PAWN_pronoun} gets to do the work that actually matters to {PAWN_objective}.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+</Defs>

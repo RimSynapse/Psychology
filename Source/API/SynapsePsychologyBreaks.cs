@@ -32,53 +32,82 @@ namespace RimSynapse.Psychology.API
         /// Applies a trait directive from the AI, adding or removing a trait dynamically.
         /// Sends a letter to the player explaining the psychological reasoning.
         /// </summary>
+        /// <summary>Sentinel target degree meaning "remove the trait from this axis" (become absent).</summary>
+        public const int AbsentDegree = int.MinValue;
+
+        /// <summary>
+        /// Whole-trait add/remove (single/aversion traits). Kept for binary compat and existing callers;
+        /// now a thin shim over the degree/effect-aware <see cref="ApplyTraitStep"/>, which routes removal
+        /// through the proper engine path so disabled-work/skill effects actually take (and untake) hold.
+        /// </summary>
         public static void ApplyTraitDirective(Pawn pawn, string traitDefName, bool add, string aiReasoning)
         {
-            if (pawn.story == null || pawn.story.traits == null) return;
-
             TraitDef traitDef = DefDatabase<TraitDef>.GetNamedSilentFail(traitDefName);
             if (traitDef == null)
             {
                 RimSynapse.SynapseLogger.Warn("psychology", $"[RimSynapse-Psychology] Trait {traitDefName} not found.");
                 return;
             }
+            int authored = (traitDef.degreeDatas != null && traitDef.degreeDatas.Count > 0) ? traitDef.degreeDatas[0].degree : 0;
+            ApplyTraitStep(pawn, traitDef, add ? authored : AbsentDegree, aiReasoning);
+        }
+
+        /// <summary>
+        /// Move a pawn along a trait axis by applying a real trait whose real effects (stat offsets, skill
+        /// gains, work-disable) then follow. Any existing trait on <paramref name="axis"/> is removed via
+        /// <see cref="TraitSet.RemoveTrait"/> — NOT a raw list mutation — and if <paramref name="targetDegree"/>
+        /// names an authored degree, that degree is gained. Either way the pawn's cached disabled-work / skill
+        /// sets are invalidated so an added (or removed) incapability trait takes effect immediately. Pass
+        /// <see cref="AbsentDegree"/> (or any non-authored degree) to end at "no trait on this axis".
+        /// </summary>
+        public static void ApplyTraitStep(Pawn pawn, TraitDef axis, int targetDegree, string aiReasoning)
+        {
+            if (pawn?.story?.traits == null || axis == null) return;
+            var traits = pawn.story.traits;
 
             bool changed = false;
+            string removedLabel = null;
+
+            var existing = traits.GetTrait(axis);
+            if (existing != null)
+            {
+                removedLabel = existing.CurrentData?.GetLabelFor(pawn) ?? axis.label;
+                traits.RemoveTrait(existing, true); // unsuppressConflicts: restore anything this trait masked
+                changed = true;
+            }
+
+            bool wantGain = targetDegree != AbsentDegree
+                && axis.degreeDatas != null && axis.degreeDatas.Any(d => d.degree == targetDegree);
+            string gainedLabel = null;
+            if (wantGain && !traits.HasTrait(axis, targetDegree))
+            {
+                traits.GainTrait(new Trait(axis, targetDegree));
+                gainedLabel = axis.DataAtDegree(targetDegree)?.GetLabelFor(pawn) ?? axis.label;
+                changed = true;
+            }
+
+            if (!changed) return;
+
+            // Recompute the cached disabled-work/skill sets so a work-disabling aversion trait (or its
+            // removal) is reflected in the work tab and job assignment right away.
+            pawn.Notify_DisabledWorkTypesChanged();
+            pawn.skills?.Notify_SkillDisablesChanged();
+
             var comp = pawn.TryGetComp<SynapsePawnComp>();
-
-            if (add && !pawn.story.traits.HasTrait(traitDef))
+            if (comp != null)
             {
-                pawn.story.traits.GainTrait(new Trait(traitDef));
-                if (comp != null)
-                {
-                    comp.dynamicTraits.Add(new RimSynapse.Psychology.Models.DynamicTraitRecord(traitDef, Find.TickManager.TicksGame, aiReasoning));
-                }
-                changed = true;
-            }
-            else if (!add && pawn.story.traits.HasTrait(traitDef))
-            {
-                var trait = pawn.story.traits.GetTrait(traitDef);
-                pawn.story.traits.allTraits.Remove(trait);
-                if (comp != null)
-                {
-                    comp.dynamicTraits.RemoveAll(x => x.traitDef == traitDef);
-                }
-                changed = true;
+                comp.dynamicTraits.RemoveAll(x => x.traitDef == axis);
+                if (wantGain)
+                    comp.dynamicTraits.Add(new RimSynapse.Psychology.Models.DynamicTraitRecord(axis, Find.TickManager.TicksGame, aiReasoning));
             }
 
-            if (changed)
-            {
-                string title = $"Personality Shift: {pawn.Name.ToStringShort}";
-                if (Prefs.DevMode)
-                {
-                    title = "[RimSynapse Psychology] " + title;
-                }
-
-                string actionStr = add ? $"gained the trait '{traitDef.degreeDatas[0].label}'" : $"lost the trait '{traitDef.degreeDatas[0].label}'";
-                string letterText = $"{pawn.Name.ToStringShort} has {actionStr}.\n\nReasoning:\n{aiReasoning}";
-
-                Find.LetterStack.ReceiveLetter(title, letterText, LetterDefOf.NeutralEvent, pawn);
-            }
+            string title = $"Personality Shift: {pawn.Name.ToStringShort}";
+            if (Prefs.DevMode) title = "[RimSynapse Psychology] " + title;
+            string actionStr = wantGain
+                ? $"gained the trait '{gainedLabel}'"
+                : $"lost the trait '{removedLabel}'";
+            string letterText = $"{pawn.Name.ToStringShort} has {actionStr}.\n\nReasoning:\n{aiReasoning}";
+            Find.LetterStack.ReceiveLetter(title, letterText, LetterDefOf.NeutralEvent, pawn);
         }
 
         // Confirmed extreme/major MentalStateDef defNames (NOT MentalBreakDefs — e.g. "Catatonic" is a

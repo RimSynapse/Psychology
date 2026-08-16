@@ -16,11 +16,15 @@ namespace RimSynapse.Psychology.Patches
 
             if (__instance.pawn == null) return;
 
+            // MoodOffset runs for every thought during every mood recalc. Most pawns have no
+            // thought sensitivities, so bail before the dictionary lookup / wildcard scan.
             var comp = __instance.pawn.GetComp<SynapseCorePawnComp>();
-            if (comp != null && comp.thoughtSensitivities != null)
+            var sensitivities = comp?.thoughtSensitivities;
+            if (sensitivities == null || sensitivities.Count == 0) return;
+
             {
                 // Match by specific thought defName (e.g., "KnowColonistDied")
-                if (comp.thoughtSensitivities.TryGetValue(__instance.def.defName, out float multiplier))
+                if (sensitivities.TryGetValue(__instance.def.defName, out float multiplier))
                 {
                     __result *= multiplier;
                     return;
@@ -33,7 +37,7 @@ namespace RimSynapse.Psychology.Patches
                 // contains the string, though that's less precise.
                 
                 // Example wildcard check for broad AI tags:
-                foreach (var kvp in comp.thoughtSensitivities)
+                foreach (var kvp in sensitivities)
                 {
                     if (__instance.def.defName.Contains(kvp.Key))
                     {

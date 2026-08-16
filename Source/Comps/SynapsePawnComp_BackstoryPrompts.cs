@@ -36,7 +36,7 @@ namespace RimSynapse.Psychology.Comps
             }
             
             // Allow Core/Factions to inject extra context (like Ideology)
-            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, "BackstoryChildhood");
+            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.BackstoryChildhood);
 
             string systemPrompt = @"You are writing a vivid third-person memory for a colonist in the RimWorld universe, as if the AI Storyteller is describing their childhood.
 This memory is from their CHILDHOOD. It should be a specific, concrete scene — not a summary.
@@ -158,7 +158,7 @@ Write a vivid childhood memory grounded in these skills.";
                 : "";
                 
             // Allow Core/Factions to inject extra context
-            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, "BackstoryAdulthood");
+            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.BackstoryAdulthood);
 
             string systemPrompt = @"You are writing a vivid third-person memory for a colonist in the RimWorld universe, as if the AI Storyteller is describing their adulthood.
 This memory is from their ADULTHOOD. It should be a specific, concrete scene — not a summary.
@@ -263,7 +263,7 @@ Write a vivid adulthood memory grounded in these skills.";
             if (adulthoodMem != null) memoriesContext += $"Adulthood Memory:\n\"{adulthoodMem.summary}\"\n\n";
             
             // Allow Core/Factions to inject extra context
-            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, "PersonalityProfile");
+            string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.PersonalityProfile);
 
             string systemPrompt = @"You are analyzing the psychology of a RimWorld colonist based on their life memories.
 Given their childhood memory, adulthood memory, and current personality traits, synthesize a psychological profile.
@@ -275,6 +275,10 @@ OUTPUT FORMAT:
    - Core Archetype (e.g., Caregiver, Outlaw, Creator, Sage, Ruler, Hero, Explorer, Jester)
    - Temperament (e.g., Sanguine, Melancholic, Phlegmatic, Choleric)
 3. [FIRST_IMPRESSION] — A detailed 2-3 sentence narrative memory of the pawn's arrival at the colony. Written in the third person perspective (using their name or ""he/she"", never ""I"" or ""my""). This should connect their background, childhood dreams, and aspirations to their landing context (e.g. waking from cryosleep).
+4. [VOICE] — How this pawn SPEAKS, so their dialogue sounds distinct from everyone else. Provide:
+   - style: how they talk — sentence length, diction, humour, verbal tics, what they avoid saying
+   - pace: one of slow | measured | fast
+   - timbre: one of warm | gruff | bright | flat | breathy | clipped
 
 You MUST respond in valid JSON:
 {
@@ -282,6 +286,7 @@ You MUST respond in valid JSON:
   ""JungianType"": ""INTJ"",
   ""CoreArchetype"": ""Explorer"",
   ""Temperament"": ""Melancholic"",
+  ""Voice"": { ""style"": ""Terse and dry; clipped sentences; deflects feelings with sarcasm; rarely finishes a sad thought."", ""pace"": ""measured"", ""timbre"": ""flat"" },
   ""FirstImpression"": ""Fred stepped out of cryosleep after decades in the void. Though this harsh desert outpost was far from the lush forest worlds of his childhood dreams, he was resolved to make it his home and build something lasting.""
 }";
 
@@ -329,19 +334,24 @@ Synthesize their psychological profile.";
                             if (parsed.TryGetValue("Temperament", out object temperament))
                                 coreComp.llmTraits.Add($"Temperament: {temperament}");
 
+                            // Voice (#33): prose speaking style (Conversations) + Kokoro assignment (TTS 0.10+).
+                            if (parsed.TryGetValue("Voice", out object voiceObj)
+                                && VoiceProfileBuilder.TryReadVoice(voiceObj, out string vStyle, out string vPace, out string vTimbre))
+                            {
+                                VoiceProfileBuilder.ApplyVoiceProfile(pawn, coreComp, vStyle, vPace, vTimbre);
+                            }
+                            else
+                            {
+                                // No Voice in the output — still assign a base Kokoro voice so TTS has one.
+                                VoiceProfileBuilder.ApplyVoiceProfile(pawn, coreComp, null, null, null);
+                            }
+
                             if (parsed.TryGetValue("FirstImpression", out object impression))
                             {
-                                coreComp.AddMemory(new WeightedMemory
-                                {
-                                    summary = impression.ToString(),
-                                    weight = 0.6f,
-                                    baseWeight = 0.6f,
-                                    decayRate = 0.005f,
-                                    tags = new List<string> { "Arrival", "FirstImpression" },
-                                    memoryType = "Arrival",
-                                    absTick = SynapseDateHelper.GetAdjustmentTick(),
-                                    gameTick = 0
-                                });
+                                // #22: the arrival first-impression is a defining memory — plant it through
+                                // the contract so it is secured (long-term) and its tags seed resonance.
+                                RimSynapse.Psychology.API.SynapsePsychology.PlantDefiningMemory(
+                                    pawn, impression.ToString(), new List<string> { "Arrival", "FirstImpression" });
                             }
 
                             BuildDynamicBackstory(pawn, coreComp);
@@ -365,6 +375,71 @@ Synthesize their psychological profile.";
             RimSynapse.Psychology.API.SynapsePsychology.QueueDailyPsychologyReview(pawn, mood, recentEvents, (success) => {
                 FinalizeBackstory(pawn, coreComp);
             }, true);
+        }
+
+        /// <summary>
+        /// Lazy voice backfill (#33): a pawn that already has a personality profile but no voice yet
+        /// (e.g. from a save predating voices) gets one derived once. Assigns the base Kokoro voice
+        /// immediately (deterministic, no LLM) and runs one cheap prompt to derive style/pace/timbre.
+        /// </summary>
+        public void DeriveVoiceProfile(Pawn pawn, RimSynapse.Comps.SynapseCorePawnComp coreComp)
+        {
+            if (coreComp == null || isGeneratingVoice) return;
+            isGeneratingVoice = true;
+
+            // Base voice is deterministic — assign now so even a failed LLM derive leaves a usable voice.
+            if (string.IsNullOrEmpty(coreComp.kokoroVoice) || !KokoroVoices.IsKnown(coreComp.kokoroVoice))
+                coreComp.kokoroVoice = KokoroVoices.RandomVoiceFor(pawn);
+
+            string traits = string.Join(", ", pawn.story?.traits?.allTraits?.Select(t => t.Label) ?? Enumerable.Empty<string>());
+            string psych = coreComp.llmTraits != null ? string.Join(", ", coreComp.llmTraits) : "none";
+
+            string systemPrompt = @"From a colonist's personality, define how they SPEAK so their dialogue sounds distinct. Respond in valid JSON:
+{ ""style"": ""how they talk: sentence length, diction, humour, verbal tics, what they avoid saying"",
+  ""pace"": ""slow|measured|fast"",
+  ""timbre"": ""warm|gruff|bright|flat|breathy|clipped"" }";
+            string userMessage = $@"Colonist: {pawn.Name.ToStringShort}
+Traits: {traits}
+Psychology: {psych}
+Personality: {coreComp.personalitySummary}";
+
+            var options = new ChatOptions { priority = 5, requestName = "Voice Profile", targetName = pawn.Name.ToStringShort };
+            SynapseClient.PromptAsync(
+                RimSynapsePsychologyMod.ModHandle,
+                systemPrompt,
+                userMessage,
+                result => OnVoiceProfileDerived(result, pawn, coreComp),
+                options
+            );
+        }
+
+        private void OnVoiceProfileDerived(ChatResult result, Pawn pawn, RimSynapse.Comps.SynapseCorePawnComp coreComp)
+        {
+            try
+            {
+                if (result.success)
+                {
+                    string json = JsonHelper.ExtractJson(result.content);
+                    if (json != null)
+                    {
+                        var jo = Newtonsoft.Json.Linq.JObject.Parse(json);
+                        VoiceProfileBuilder.ApplyVoiceProfile(pawn, coreComp,
+                            jo.Value<string>("style"), jo.Value<string>("pace"), jo.Value<string>("timbre"));
+                        RimSynapse.SynapseLogger.Info("psychology",
+                            $"[RimSynapse-Psychology] Voice derived for {pawn.Name.ToStringShort}: {coreComp.kokoroVoice}, speed {coreComp.kokoroSpeed:F2}.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                RimSynapse.SynapseLogger.Warn("psychology", $"[RimSynapse-Psychology] Voice derive parse failed: {ex.Message}");
+            }
+            finally
+            {
+                // Mark generated even on failure (base voice is assigned) so we don't retry forever.
+                coreComp.voiceGenerated = true;
+                isGeneratingVoice = false;
+            }
         }
     }
 }

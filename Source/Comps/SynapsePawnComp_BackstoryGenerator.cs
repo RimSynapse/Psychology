@@ -24,6 +24,7 @@ namespace RimSynapse.Psychology.Comps
     public partial class SynapsePawnComp
     {
         private bool isGeneratingBackstory = false;
+        private bool isGeneratingVoice = false;   // transient in-flight guard for voice backfill (#33)
 
         /// <summary>
         /// Entry point — called from CompTickRare when the pawn doesn't have a backstory yet.

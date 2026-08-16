@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+  <!--
+    Skill-driven aversion (RimSynapse trait engine). A pawn who fixates on one passion and starves
+    another grows a graduated DISTASTE for the affected work: reluctant -> averse, expressed as a
+    growing skill penalty (the "slow learner / rusty" effect) rather than a hard block. Only the rarest,
+    most sustained crash-out reaches the separate INCAPABLE trait, which actually disables the work type.
+    All commonality 0 (engine-assigned only). Applied via SynapsePsychology.ApplyTraitStep/ApplyTraitDirective;
+    removal routes through TraitSet.RemoveTrait so the skill penalty / work-disable is undone cleanly.
+  -->
+
+  <!-- ============================ Graduated distaste spectra ============================ -->
+
+  <TraitDef>
+    <defName>Synapse_Aversion_Intellectual</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li>
+        <degree>1</degree>
+        <label>reluctant thinker</label>
+        <description>{PAWN_nameDef} has soured on intellectual work and drags {PAWN_objective}self to the research bench.</description>
+        <statFactors><ResearchSpeed>0.85</ResearchSpeed></statFactors>
+      </li>
+      <li>
+        <degree>2</degree>
+        <label>research-averse</label>
+        <description>{PAWN_nameDef} has come to resent intellectual work; {PAWN_possessive} mind balks at it and the work crawls.</description>
+        <statFactors><ResearchSpeed>0.6</ResearchSpeed></statFactors>
+      </li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Aversion_Plants</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li>
+        <degree>1</degree>
+        <label>reluctant grower</label>
+        <description>{PAWN_nameDef} is tiring of the fields and tends them with waning care.</description>
+        <statFactors><PlantWorkSpeed>0.85</PlantWorkSpeed></statFactors>
+      </li>
+      <li>
+        <degree>2</degree>
+        <label>growing-averse</label>
+        <description>{PAWN_nameDef} has grown to resent working the soil, and labors at it slowly and grudgingly.</description>
+        <statFactors><PlantWorkSpeed>0.6</PlantWorkSpeed></statFactors>
+      </li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Aversion_Crafting</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li>
+        <degree>1</degree>
+        <label>reluctant crafter</label>
+        <description>{PAWN_nameDef} is losing patience with the crafting bench.</description>
+        <statFactors><WorkSpeedGlobal>0.92</WorkSpeedGlobal></statFactors>
+      </li>
+      <li>
+        <degree>2</degree>
+        <label>crafting-averse</label>
+        <description>{PAWN_nameDef} has come to resent crafting, and works with dull, grudging hands.</description>
+        <statFactors><WorkSpeedGlobal>0.8</WorkSpeedGlobal></statFactors>
+      </li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Aversion_Violent</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li>
+        <degree>1</degree>
+        <label>reluctant hunter</label>
+        <description>{PAWN_nameDef} is wearying of the hunt.</description>
+        <statFactors><HuntingStealth>0.85</HuntingStealth></statFactors>
+      </li>
+      <li>
+        <degree>2</degree>
+        <label>hunt-averse</label>
+        <description>{PAWN_nameDef} recoils from the killing now, and {PAWN_possessive} heart is no longer in it.</description>
+        <statFactors><HuntingStealth>0.6</HuntingStealth></statFactors>
+      </li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Aversion_Social</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li>
+        <degree>1</degree>
+        <label>reluctant warden</label>
+        <description>{PAWN_nameDef} is tiring of managing other people.</description>
+        <statFactors><SocialImpact>0.85</SocialImpact></statFactors>
+      </li>
+      <li>
+        <degree>2</degree>
+        <label>warden-averse</label>
+        <description>{PAWN_nameDef} has come to resent social duty, and {PAWN_possessive} way with people has frayed.</description>
+        <statFactors><SocialImpact>0.6</SocialImpact></statFactors>
+      </li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Aversion_Mining</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li>
+        <degree>1</degree>
+        <label>reluctant miner</label>
+        <description>{PAWN_nameDef} is tiring of the tunnels.</description>
+        <statFactors><MiningSpeed>0.85</MiningSpeed></statFactors>
+      </li>
+      <li>
+        <degree>2</degree>
+        <label>mining-averse</label>
+        <description>{PAWN_nameDef} has come to dread mining, and works the rock slowly and grudgingly.</description>
+        <statFactors><MiningSpeed>0.6</MiningSpeed></statFactors>
+      </li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Aversion_Cooking</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li>
+        <degree>1</degree>
+        <label>reluctant cook</label>
+        <description>{PAWN_nameDef} is losing enthusiasm for the stove.</description>
+        <statFactors><CookSpeed>0.85</CookSpeed></statFactors>
+      </li>
+      <li>
+        <degree>2</degree>
+        <label>cooking-averse</label>
+        <description>{PAWN_nameDef} has come to hate cooking, and lingers unwillingly at the stove.</description>
+        <statFactors><CookSpeed>0.6</CookSpeed></statFactors>
+      </li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Aversion_Artistic</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li>
+        <degree>1</degree>
+        <label>reluctant artist</label>
+        <description>{PAWN_nameDef} is losing the joy in making art.</description>
+        <statFactors><WorkSpeedGlobal>0.92</WorkSpeedGlobal></statFactors>
+      </li>
+      <li>
+        <degree>2</degree>
+        <label>art-averse</label>
+        <description>{PAWN_nameDef} has come to resent art, and creates slowly and without heart.</description>
+        <statFactors><WorkSpeedGlobal>0.8</WorkSpeedGlobal></statFactors>
+      </li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Aversion_Animals</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li>
+        <degree>1</degree>
+        <label>reluctant handler</label>
+        <description>{PAWN_nameDef} is cooling toward the animals.</description>
+        <statFactors><AnimalGatherSpeed>0.85</AnimalGatherSpeed></statFactors>
+      </li>
+      <li>
+        <degree>2</degree>
+        <label>handling-averse</label>
+        <description>{PAWN_nameDef} has grown cold to the animals, and tends them slowly and grudgingly.</description>
+        <statFactors><AnimalGatherSpeed>0.6</AnimalGatherSpeed></statFactors>
+      </li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Aversion_Construction</defName>
+    <commonality>0</commonality>
+    <degreeDatas>
+      <li>
+        <degree>1</degree>
+        <label>reluctant builder</label>
+        <description>{PAWN_nameDef} is tiring of construction work.</description>
+        <statFactors><ConstructionSpeed>0.85</ConstructionSpeed></statFactors>
+      </li>
+      <li>
+        <degree>2</degree>
+        <label>building-averse</label>
+        <description>{PAWN_nameDef} has come to resent building, and works slowly and grudgingly.</description>
+        <statFactors><ConstructionSpeed>0.6</ConstructionSpeed></statFactors>
+      </li>
+    </degreeDatas>
+  </TraitDef>
+
+  <!-- ===================== Rare terminal: full incapability (work-disable) ===================== -->
+
+  <TraitDef>
+    <defName>Synapse_Incapable_Intellectual</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Research</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>research-broken</label><description>{PAWN_nameDef} can no longer bring {PAWN_objective}self to do intellectual work at all.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Incapable_Plants</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Growing</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>growing-broken</label><description>{PAWN_nameDef} cannot stand to work the soil any longer.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Incapable_Crafting</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Crafting</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>crafting-broken</label><description>{PAWN_nameDef} will no longer work at the crafting bench.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Incapable_Violent</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Hunting</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>hunt-broken</label><description>{PAWN_nameDef} can no longer stomach the hunt.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Incapable_Social</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Warden</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>warden-broken</label><description>{PAWN_nameDef} refuses warden duty entirely.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Incapable_Mining</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Mining</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>mining-broken</label><description>{PAWN_nameDef} will not set foot in the mines again.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Incapable_Cooking</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Cooking</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>cooking-broken</label><description>{PAWN_nameDef} will no longer cook.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Incapable_Artistic</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Art</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>art-broken</label><description>{PAWN_nameDef} can no longer create art.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Incapable_Animals</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Handling</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>handling-broken</label><description>{PAWN_nameDef} refuses to handle the animals.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+  <TraitDef>
+    <defName>Synapse_Incapable_Construction</defName>
+    <commonality>0</commonality>
+    <disabledWorkTypes><li>Construction</li></disabledWorkTypes>
+    <degreeDatas>
+      <li><label>building-broken</label><description>{PAWN_nameDef} will no longer take up construction.</description></li>
+    </degreeDatas>
+  </TraitDef>
+
+</Defs>

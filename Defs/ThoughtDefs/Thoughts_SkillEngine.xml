@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+  <!--
+    Growing unease (RimSynapse skill-driven trait engine). The common, reversible outcome when a pawn's
+    behaviour is building trait pressure but no permanent shift has fired: a mood modifier applied at the
+    rest edge whose stage deepens as pressure climbs. This, plus the LLM night report, is the warning the
+    player acts on (reassign work) before a rare trait shift ever rolls. The engine forces the stage by
+    pressure via ThoughtMaker.MakeThought(def, stageIndex).
+  -->
+  <ThoughtDef>
+    <defName>Synapse_Unease</defName>
+    <thoughtClass>Thought_Memory</thoughtClass>
+    <durationDays>1.5</durationDays>
+    <stages>
+      <li>
+        <label>faint unease</label>
+        <description>Something about how I've been spending my days doesn't quite sit right.</description>
+        <baseMoodEffect>-2</baseMoodEffect>
+      </li>
+      <li>
+        <label>growing unease</label>
+        <description>A restlessness is building in me. My days feel out of balance, and it's starting to wear.</description>
+        <baseMoodEffect>-4</baseMoodEffect>
+      </li>
+      <li>
+        <label>deep unease</label>
+        <description>I can't shake this. Something has to change in how I live, or I'm going to come apart.</description>
+        <baseMoodEffect>-7</baseMoodEffect>
+      </li>
+    </stages>
+  </ThoughtDef>
+
+</Defs>

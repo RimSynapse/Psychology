@@ -11,9 +11,16 @@ namespace RimSynapse.Psychology.Patches
         public static void Postfix(Pawn_RelationsTracker __instance, Pawn other, ref int __result, Pawn ___pawn)
         {
             if (___pawn == null || other == null) return;
-            
+
+            // OpinionOf is one of the hottest methods in the game (social thoughts, target
+            // selection, float menus, lord/caravan AI). The overwhelming majority of calls are
+            // for pawns with no Synapse social record, so bail before allocating the id string
+            // and doing the dictionary lookup. (Re-keying socialNetwork from string to int id to
+            // drop the GetUniqueLoadID allocation entirely is tracked in Psychology #57 — it
+            // touches serialization and every access site.)
             var comp = ___pawn.GetComp<SynapsePawnComp>();
-            if (comp != null && comp.socialNetwork != null)
+            if (comp?.socialNetwork == null || comp.socialNetwork.Count == 0) return;
+
             {
                 string otherId = other.GetUniqueLoadID();
                 if (comp.socialNetwork.TryGetValue(otherId, out var record) && record != null)

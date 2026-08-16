@@ -35,6 +35,10 @@ namespace RimSynapse.Psychology.API
                         string shiftLikelihood = parsed.TryGetValue("PersonalityShiftLikelihood", out var likeObj)
                             ? likeObj?.ToString() : null;
 
+                        // Each evaluation is a fresh snapshot — clear prior keys so retired categories
+                        // (the old 9-section schema) don't linger in medicalProfile alongside the new 5.
+                        pawnComp.medicalProfile?.Clear();
+
                         foreach (var kvp in parsed)
                         {
                             if (kvp.Key == "SocialAdjustments" && kvp.Value is Newtonsoft.Json.Linq.JObject socialObj)
@@ -45,13 +49,13 @@ namespace RimSynapse.Psychology.API
                             {
                                 ApplyAbandonmentRisk(pawn, Convert.ToInt32(kvp.Value));
                             }
-                            else if (kvp.Key == "PersonalityShiftAssessment" && kvp.Value is Newtonsoft.Json.Linq.JArray assessmentArr)
+                            else if (kvp.Key == "TraitJudgment" && kvp.Value is Newtonsoft.Json.Linq.JArray judgmentArr)
                             {
-                                ApplyPersonalityShiftAssessment(pawn, pawnComp, shiftLikelihood, assessmentArr);
+                                ApplyTraitJudgment(pawn, pawnComp, judgmentArr);
                             }
-                            else if (kvp.Key == "TraitChanges")
+                            else if (kvp.Key == "PersonalityShiftAssessment" || kvp.Key == "TraitChanges")
                             {
-                                // Legacy schema — the engine no longer applies instant flips; ignore, keep for record.
+                                // Legacy schemas — the measured engine drives changes now; ignore, keep for record.
                                 pawnComp.medicalProfile[kvp.Key] = kvp.Value?.ToString() ?? "";
                             }
                             else
@@ -132,63 +136,47 @@ namespace RimSynapse.Psychology.API
         private const long TraitChangeCooldownTicks = 3 * 60000; // 3 in-game days between actual changes
 
         /// <summary>
-        /// Fold today's per-trait evidence into the multi-day pressure accumulator (design §5.7). Changes
-        /// fire only when sustained pressure crosses the (resistance-raised) threshold, subject to the
-        /// consistency gate, a whitelist, a per-eval cap, and a cooldown. Never an instant one-day flip.
+        /// Phase 2: store the LLM's per-candidate JUDGEMENT (in/out of character) and NARRATION (flavour) for
+        /// the changes the MEASURED engine is building. The LLM no longer accumulates pressure or fires
+        /// changes itself — that would double-write the store the engine drives. It only advises: the engine
+        /// consults these at fire time to narrate (flavour) and, if enabled, push back on out-of-character
+        /// changes. Candidate ids not currently under pressure are rejected (guards hallucinated ids, #60).
         /// </summary>
-        private static void ApplyPersonalityShiftAssessment(Pawn pawn, SynapsePawnComp pawnComp, string likelihood,
-            Newtonsoft.Json.Linq.JArray assessment)
+        private static void ApplyTraitJudgment(Pawn pawn, SynapsePawnComp pawnComp, Newtonsoft.Json.Linq.JArray judgments)
         {
+            if (pawnComp == null || judgments == null) return;
+            if (pawnComp.traitJudgments == null)
+                pawnComp.traitJudgments = new System.Collections.Generic.Dictionary<string, RimSynapse.Psychology.Models.TraitJudgmentRecord>();
             var coreComp = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
-            if (coreComp == null || assessment == null) return;
+            int now = Find.TickManager?.TicksGame ?? 0;
+            var summary = new List<string>();
 
-            long now = Find.TickManager?.TicksAbs ?? 0L;
-            int changesThisEval = 0;
-            var trajectory = new List<string>();
-
-            foreach (var token in assessment)
+            foreach (var token in judgments)
             {
                 if (!(token is Newtonsoft.Json.Linq.JObject obj)) continue;
-
-                string trait = (string)obj["trait"];
-                if (string.IsNullOrEmpty(trait)) continue;
-                string direction = ((string)obj["direction"] ?? "add").ToLowerInvariant();
-                float dailyPressure = (float?)obj["dailyPressure"] ?? 0f;
-                string rationale = (string)obj["rationale"] ?? "";
-
-                // Consistency gate: an "unlikely"/none overall likelihood floors today's evidence to 0.
-                dailyPressure = SynapseTraitPolicy.GateDailyPressure(likelihood, dailyPressure);
-                dailyPressure = UnityEngine.Mathf.Clamp(dailyPressure, 0f, 1f);
-
-                float resistance = SynapseTraitPolicy.ResistanceFactor(trait);
-                float pressure = coreComp.AccumulateTraitPressure(trait, dailyPressure, direction, resistance, now,
-                    RimSynapse.Comps.SynapseCorePawnComp.TraitPressureDecayPerDay);
-
-                // Protected traits require overwhelming, sustained pressure before removal.
-                float threshold = RimSynapsePsychologyMod.Settings?.shiftThreshold ?? ShiftThreshold;
-                if (direction == "remove" && SynapseTraitPolicy.IsProtected(trait)) threshold *= 2f;
-
-                trajectory.Add($"{trait} {pressure:0.00}/{threshold:0.0} → {direction}");
-
-                bool cooldownOk = pawnComp.lastTraitChangeTick < 0 || (now - pawnComp.lastTraitChangeTick) >= TraitChangeCooldownTicks;
-                if (pressure < threshold || changesThisEval >= MaxTraitChangesPerEval || !cooldownOk) continue;
-
-                // Whitelist guardrail: the AI may only add/remove sanctioned traits (never e.g. Psychopath).
-                if (!SynapseTraitPolicy.IsWhitelisted(trait))
+                string candidateId = (string)obj["candidateId"];
+                if (string.IsNullOrEmpty(candidateId)) continue;
+                if (coreComp?.traitPressures != null && !coreComp.traitPressures.ContainsKey(candidateId))
+                    continue; // reject ids the engine isn't actually building
+                string verdict = ((string)obj["verdict"] ?? "uncertain").Trim().ToLowerInvariant();
+                string flavor = (string)obj["flavor"] ?? "";
+                pawnComp.traitJudgments[candidateId] = new RimSynapse.Psychology.Models.TraitJudgmentRecord
                 {
-                    RimSynapse.SynapseLogger.Warn("psychology", $"[RimSynapse-Psychology] Blocked non-whitelisted trait change '{trait}' for {pawn.Name?.ToStringShort}.");
-                    continue;
-                }
-
-                bool add = direction == "add";
-                string reason = $"Sustained multi-day pressure ({pressure:0.00}) crossed the threshold. {rationale}".Trim();
-                SynapseGameComponent.Enqueue(() => SynapsePsychology.ApplyTraitDirective(pawn, trait, add, reason));
-                coreComp.ResetTraitPressure(trait);
-                pawnComp.lastTraitChangeTick = now;
-                changesThisEval++;
+                    verdict = verdict, flavor = flavor, tick = now
+                };
+                summary.Add($"{candidateId}: {verdict}");
             }
 
-            pawnComp.medicalProfile["PersonalityTrajectory"] = trajectory.Count > 0 ? string.Join("; ", trajectory) : "stable";
+            // Drop judgements for candidates whose pressure has since decayed away.
+            if (coreComp?.traitPressures != null)
+            {
+                var stale = new List<string>();
+                foreach (var k in pawnComp.traitJudgments.Keys)
+                    if (!coreComp.traitPressures.ContainsKey(k)) stale.Add(k);
+                foreach (var k in stale) pawnComp.traitJudgments.Remove(k);
+            }
+
+            pawnComp.medicalProfile["PersonalityTrajectory"] = summary.Count > 0 ? string.Join("; ", summary) : "stable";
         }
 
         public static void SummarizeTherapySession(Pawn initiator, Pawn target, List<string> chatLog)
