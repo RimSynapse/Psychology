@@ -35,11 +35,11 @@ Companion Mod for RimSynapse. Requires RimSynapse - Core.
 Brings your colonists to life by giving them evolving memories, complex interpersonal trust, therapeutic sessions, and trauma responses. 
 
 --- Current Features ---
-- Dynamic Personality Traits: The 24-hour psychological evaluation tracks profound life events. Pawns can dynamically gain or lose RimWorld traits (such as gaining Bloodlust after a brutal raid, or losing Kind) based on LLM analysis of their rolling short-term memory.
-- Trust and Familiarity System: Replaces vanilla's rigid opinion system with dynamic Trust (-100 to 100) and Familiarity (0 to 100) values. Vanilla OpinionOf is scaled down by 50%, with the custom Trust metric contributing the remaining 50% weight.
-- PTSD and Suicidal Breaks: Pawns suffering severe trauma can experience extreme mental breaks: they may enter a "Trauma Trigger" break (blindly firing at doors, walls, or loud noises before cowering) or attempt a lethal "Suicide/Self-Harm" break using their equipped primary weapon to target critical organs with a 5x damage multiplier.
-- Therapy and Consoling: Right-click target pawns to initiate a Therapy Session. The therapist and patient will sit together and dynamically converse via the background LLM engine. Successful sessions have a dynamic chance (influenced by mood) to permanently cure/remove severe negative and psychological traits (including PTSD, Depressive, Volatile, Nervous, Psychopath, and Bloodlust - unless locked by their backstory).
-- Opportunistic Euphoria: Pawns who maintain an extremely high mood (>90%) for a sustained 24 in-game hours will automatically generate a positive core memory.
+- Dynamic Personality Traits: The nightly psychological evaluation tracks profound life events. Pawns can dynamically gain or lose RimWorld traits (such as gaining Bloodlust after a brutal raid, or losing Kind) based on LLM analysis of their rolling short-term memory. Cadence is adjustable in mod settings, from nightly up to every 7 days.
+- Trust and Familiarity System: Replaces vanilla's rigid opinion system with dynamic Trust (-100 to 100) and Familiarity (0 to 100) values. By default vanilla OpinionOf is scaled down by 50%, with the custom Trust metric contributing the remaining 50% weight - the blend is a slider.
+- Trauma, Despair and Mania: Three mental breaks vanilla does not have. A "Trauma Trigger" break has a pawn blindly firing at doors, walls or loud noises before cowering. A "Suicide/Self-Harm" break uses their equipped primary weapon against critical organs (5x damage by default, adjustable). And a pawn riding an extreme high - through bipolar, or a manic swing after a recent crash - can tip into "Euphoric (Reckless)" behaviour.
+- Therapy and Consoling: Right-click target pawns to initiate a Therapy Session. The therapist and patient will sit together and dynamically converse via the background LLM engine. Successful sessions have a dynamic chance (influenced by mood) to permanently cure/remove severe negative and psychological traits (including PTSD, Depressive, Pessimist, Volatile, Nervous, Psychopath, and Bloodlust - unless locked by their backstory).
+- Good Years Get Recorded: Good times are not just the absence of bad ones. A pawn who holds their mood at or above 85% for a sustained 24 in-game hours has the stretch picked up and queued for a psychological review, so it is written into their history alongside the hard years.
 - Ritual Remarks: Colonists pull from their LLM relationship memories to deliver personalized Vows during marriages and Eulogies during funerals.
 - Forced Psychological Reviews: Demand an immediate clinical evaluation of the pawn's mental state from the LLM via the new Social Network tab.
 - World VIP Backstories: Faction Leaders are no longer generic. They generate with a rich, ideologically consistent history and personality profile.
@@ -51,8 +51,10 @@ Brings your colonists to life by giving them evolving memories, complex interper
 - Psychological Addictions: Pawns may turn to specific drugs as a coping mechanism for specific negative memories.
 
 --- Roadmap ---
-0.9 - Factions and Living Societies: Living social dynamics - colony cliques and a rumour mill, familiarity-milestone events, a trait-history timeline and social-network view, and auto-running therapy sessions (with Conversations).
-0.10 - Cross-Mod Capability Passes: Another pass over how psychology feeds factions, news and narration across the suite.
+0.8.1 - Clinical Review Scheduling: the nightly psychological reviews plan themselves against the length of the night and finish by morning even on a large colony, instead of firing on a timer and running late. Plus close-out work on the living-traits engine.
+0.9.0 - Prisoners, Leaders and Trait History: psychological profiles for prisoners, slaves and guests, so captives think and speak like themselves instead of sharing one blank register. Visitor and world-leader backstories can take in outside context and reflect where they came from. And a chronological trait-history timeline: every trait a colonist has gained or lost, dated, with the reasoning kept - including the losses, which are currently erased.
+0.10.0 - Living Societies: colonists form cliques out of who they actually spend their time with, a rumour mill carries news between them, and crossing a friendship milestone sends you a letter. Therapy sessions gain the option to resolve in the background or be watched live as they play out.
+0.11.0 - Social Network Visualization: the Social Network tab becomes a colony-wide graph of trust and familiarity - one node per colonist, edges coloured by the relationship, and cliques drawn out as groups.
 These ship when they are ready - no dates.
 
 --- Changelog (v0.8.0) - Living Traits, Voice and Clinical Insight ---

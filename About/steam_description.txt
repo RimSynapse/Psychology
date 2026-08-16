@@ -3,30 +3,18 @@
 
 [h1]RimSynapse - Psychology[/h1]
 [b][url=https://github.com/RimSynapse/Psychology/wiki]Official Wiki and Documentation[/url][/b]
-[b]Brings your colonists to life by giving them evolving memories, complex interpersonal trust, therapeutic sessions, and trauma responses using LLMs.[/b]
+[b]Your colonists remember what happened to them, and it changes who they become.[/b]
 
-Breathe genuine psychological depth into your colonists. RimSynapse Psychology replaces rigid vanilla opinions with a fluid Trust/Familiarity system and lets pawns accumulate core memories that dynamically reshape their traits and mental breaks based on LLM analysis.
-
----
-
-[h2]Key Features[/h2]
-[list]
-[*] [b]Dynamic Personality Traits:[/b] The 24-hour psychological evaluation tracks profound life events. Pawns can dynamically gain or lose RimWorld traits (such as gaining Bloodlust after a brutal raid, or losing Kind) based on LLM analysis of their rolling short-term memory.
-[*] [b]Trust and Familiarity System:[/b] Replaces vanilla's rigid opinion system with dynamic Trust (-100 to 100) and Familiarity (0 to 100) values. Vanilla OpinionOf is scaled down by 50%, with the custom Trust metric contributing the remaining 50% weight.
-[*] [b]PTSD and Suicidal Breaks:[/b] Pawns suffering severe trauma can experience extreme mental breaks: they may enter a "Trauma Trigger" break (blindly firing at doors, walls, or loud noises before cowering) or attempt a lethal "Suicide/Self-Harm" break using their equipped primary weapon to target critical organs with a 5x damage multiplier.
-[*] [b]Therapy and Consoling:[/b] Right-click target pawns to initiate a Therapy Session. The therapist and patient will sit together and dynamically converse via the background LLM engine. Successful sessions have a dynamic chance (influenced by mood) to permanently [b]cure/remove severe negative and psychological traits[/b] (including PTSD, Depressive, Volatile, Nervous, Psychopath, and Bloodlust - unless locked by their backstory).
-[*] [b]Opportunistic Euphoria:[/b] Pawns who maintain an extremely high mood (>90%) for a sustained 24 in-game hours will automatically generate a positive core memory.
-[*] [b]Ritual Remarks:[/b] Colonists pull from their LLM relationship memories to deliver personalized Vows during marriages and Eulogies during funerals.
-[*] [b]Forced Psychological Reviews:[/b] Demand an immediate clinical evaluation of the pawn's mental state from the LLM via the new Social Network tab.
-[*] [b]World VIP Backstories:[/b] Faction Leaders generate with a rich, ideologically consistent history and personality profile.
-[/list]
+RimSynapse Psychology replaces vanilla's rigid opinion number with a fluid Trust and Familiarity system, and lets colonists accumulate core memories that reshape their traits, their relationships and their mental breaks - all read and weighed by a language model.
 
 ---
 
 [h2]Roadmap[/h2]
 [list]
-[*] [b]0.9 - Factions and Living Societies:[/b] Living social dynamics - colony cliques and a rumour mill, familiarity-milestone events, a trait-history timeline and social-network view, and auto-running therapy sessions (with Conversations).
-[*] [b]0.10 - Cross-Mod Capability Passes:[/b] Another pass over how psychology feeds factions, news and narration across the suite.
+[*] [b]0.8.1 - Clinical Review Scheduling:[/b] nightly reviews size themselves to the night and finish by morning on a large colony.
+[*] [b]0.9.0 - Prisoners, Leaders and Trait History:[/b] profiles for prisoners, slaves and guests, richer visitor and leader backstories, and a dated timeline of traits gained or lost.
+[*] [b]0.10.0 - Living Societies:[/b] colony cliques, a rumour mill, friendship-milestone letters, and therapy that can run in the background or be watched live.
+[*] [b]0.11.0 - Social Network Visualization:[/b] the Social Network tab becomes a colony-wide graph of trust, familiarity and cliques.
 [/list]
 These ship when they are ready - no dates.
 
@@ -55,11 +43,6 @@ These ship when they are ready - no dates.
 [*] The daily evaluation now separates today from a lifetime of history, and the memory panel splits short vs long-term by real importance.
 [/list]
 
-[h2]Changelog (v0.7.0) - Regions and Territories Compatibility[/h2]
-[list]
-[*] Moves in step with RimSynapse Core v0.7.0.
-[*] Requires Core v0.7.0; saves and settings carry over unchanged.
-[/list]
 [b]Full version history:[/b] [url=https://github.com/RimSynapse/Psychology/wiki/Changelog]github.com/RimSynapse/Psychology/wiki[/url]
 
 ---
