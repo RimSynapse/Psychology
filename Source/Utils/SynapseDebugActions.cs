@@ -13,6 +13,49 @@ namespace RimSynapse.Psychology.Utils
 {
     public static class SynapseDebugActions
     {
+        /// <summary>#63: force the full profile pipeline on the clicked pawn — prisoner, slave, guest,
+        /// or a raider (to prove exclusion is only a gate, not a capability limit). Generation is async;
+        /// afterwards use "Dump personality" / "Dump voice" to confirm llmTraits, personalitySummary and
+        /// a voice were produced, framed by the pawn's standing.</summary>
+        [DebugAction("RimSynapse", "Psychology: Force profile generation (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ForceProfileGeneration(Pawn p)
+        {
+            if (p == null) return;
+            var psych = p.TryGetComp<SynapsePawnComp>();
+            if (psych == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.Name} has no SynapsePawnComp."); return; }
+            string role = p.IsSlaveOfColony ? "slave" : p.IsPrisonerOfColony ? "prisoner" : p.IsColonist ? "colonist" : p.IsQuestLodger() ? "guest" : "outsider";
+            bool eligible = SynapsePsychology.IsEligibleForReview(p);
+            psych.DebugForceProfile(p);
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse] Forced profile generation for {p.LabelShort} (standing: {role}, would-generate-normally: {eligible}). " +
+                "Async — check 'Dump personality'/'Dump voice' once requests complete.");
+        }
+
+        /// <summary>#63: dump every spawned humanlike on the map with its colony standing and whether it
+        /// is eligible for profile generation, so the cost surface is inspectable — confirming prisoners,
+        /// slaves and staying guests qualify while raiders and passing visitors are excluded.</summary>
+        [DebugAction("RimSynapse", "Psychology: Dump generation eligibility (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void DumpGenerationEligibility()
+        {
+            var map = Find.CurrentMap;
+            if (map == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse] No current map."); return; }
+            int eligible = 0, excluded = 0;
+            RimSynapse.SynapseLogger.Info("psychology", "--- Profile-generation eligibility (spawned humanlikes) ---");
+            foreach (var p in map.mapPawns.AllPawnsSpawned.Where(x => x.RaceProps.Humanlike && !x.Dead).OrderByDescending(x => SynapsePsychology.IsEligibleForReview(x)))
+            {
+                bool ok = SynapsePsychology.IsEligibleForReview(p);
+                if (ok) eligible++; else excluded++;
+                string standing = p.IsSlaveOfColony ? "slave" : p.IsPrisonerOfColony ? "prisoner"
+                    : p.IsColonist ? "colonist" : p.IsQuestLodger() ? "guest(lodger)"
+                    : (p.HostileTo(Faction.OfPlayer) ? "hostile" : "visitor/other");
+                var core = p.TryGetComp<SynapseCorePawnComp>();
+                bool hasProfile = core != null && !string.IsNullOrEmpty(core.personalitySummary);
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"  {(ok ? "[GEN]" : "[skip]")} {p.LabelShort} — {standing} — faction {p.Faction?.Name ?? "none"} — profile:{(hasProfile ? "yes" : "no")}");
+            }
+            RimSynapse.SynapseLogger.Info("psychology", $"--- {eligible} eligible / {excluded} excluded ---");
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump State (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpPsychologyState(Pawn p)
         {
