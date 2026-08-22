@@ -2,6 +2,11 @@
 
 Full version history for RimSynapse - Psychology. The mod page and Workshop description show only the latest release; every earlier version is recorded here.
 
+## v0.9.0 - Prisoner Minds and Linked Memories
+- NEW - Psychological profiles for prisoners, slaves and guests: captives and visitors staying under your roof now think, evaluate and speak as themselves instead of sharing one blank register - the foundation warden conversations build on.
+- Changed: event and death memories now key their subject on Core 0.9's canonical pawn id, so a colonist's memories about someone truly link up - chit-chat about a pawn consolidates with their later death, as it always should have.
+- Requires RimSynapse Core v0.9.0.
+
 ## v0.7.1 - Gradual personality and smarter memory
 - Fixed the headline bug: a colonist could gain Bloodlust and lose a steadfast trait just from repeatedly attacking an object (like a wrecked vehicle). Violence against inert objects is now clearly distinguished from harming the living and can no longer drive bloodthirsty personality changes.
 - NEW - Gradual, multi-day personality shifts: traits no longer flip in a single day. Evidence builds as "pressure" over several days, is resisted by steadfast traits (which also protect themselves from removal), and only fires once sustained - and an evaluation that calls a shift "unlikely" can no longer flip a trait at all.

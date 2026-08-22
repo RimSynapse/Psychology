@@ -4,7 +4,7 @@
     <author>RimSynapse Team</author>
     <packageId>RimSynapse.Psychology</packageId>
     <url>https://github.com/RimSynapse/Psychology</url>
-    <modVersion>0.8.0</modVersion>
+    <modVersion>0.9.0</modVersion>
     <supportedVersions>
         <li>1.5</li>
         <li>1.6</li>
@@ -26,7 +26,7 @@
     </loadAfter>
     <description>
 Discord Community: https://discord.gg/eVBebZ2N9s
-Version: v0.8.0 (Target: RimWorld 1.6)
+Version: v0.9.0 (Target: RimWorld 1.6)
 
 RimSynapse - Psychology
 Official Wiki and Documentation: https://github.com/RimSynapse/Psychology/wiki
@@ -51,34 +51,14 @@ Brings your colonists to life by giving them evolving memories, complex interper
 - Psychological Addictions: Pawns may turn to specific drugs as a coping mechanism for specific negative memories.
 
 --- Roadmap ---
-0.8.1 - Clinical Review Scheduling: the nightly psychological reviews plan themselves against the length of the night and finish by morning even on a large colony, instead of firing on a timer and running late. Plus close-out work on the living-traits engine.
-0.9.0 - Prisoners, Leaders and Trait History: psychological profiles for prisoners, slaves and guests, so captives think and speak like themselves instead of sharing one blank register. Visitor and world-leader backstories can take in outside context and reflect where they came from. And a chronological trait-history timeline: every trait a colonist has gained or lost, dated, with the reasoning kept - including the losses, which are currently erased.
-0.10.0 - Living Societies: colonists form cliques out of who they actually spend their time with, a rumour mill carries news between them, and crossing a friendship milestone sends you a letter. Therapy sessions gain the option to resolve in the background or be watched live as they play out.
+0.10.0 - Leaders, Trait History and Living Societies: visitor and world-leader backstories that take in outside context; a chronological trait-history timeline (every trait gained or lost, dated, with the reasoning kept); colonists forming cliques from who they actually spend time with, a rumour mill, and friendship-milestone letters.
 0.11.0 - Social Network Visualization: the Social Network tab becomes a colony-wide graph of trust and familiarity - one node per colonist, edges coloured by the relationship, and cliques drawn out as groups.
 These ship when they are ready - no dates.
 
---- Changelog (v0.8.0) - Living Traits, Voice and Clinical Insight ---
-- NEW - Living traits: a colonist's personality now drifts from what they actually do and live through, weighed by an LLM judge and narrated back to you, with a feedback loop that learns as it goes.
-- NEW - Kindness and abrasiveness now register as social signals, feeding new affinity and devotion between colonists - and pawns pushed past their limits develop graduated aversions and their own ways of coping.
-- NEW - "Forming Traits" view: the pawn's Psychology window now shows which traits are drifting and where they are heading, with new sliders in mod settings to tune how fast personalities change.
-- NEW - Pawn Voice: Psychology now writes each colonist's narrative voice - their turn of phrase plus a spoken Kokoro voice - so they sound like themselves.
-- NEW - Colonists now form a memory of the day they arrived, and Psychology plugs into Core 0.8's shared context hooks so other modules can read a pawn's state.
-- Changed: the clinical evaluation is rebuilt into five dynamic sections with at-a-glance warning badges, and now covers only pawns affiliated with your colony.
-- Changed: episode narration only speaks up when a pawn was actually involved, uses the right pronouns, and runs as long as the moment deserves.
-- Performance: smoothed out the mental-break manager and trimmed hot-path costs for less stutter.
-
---- Changelog (v0.7.1) - Gradual personality and smarter memory ---
-- Fixed the headline bug: a colonist could gain Bloodlust and lose a steadfast trait just from repeatedly attacking an object (like a wrecked vehicle). Violence against inert objects is now clearly distinguished from harming the living and can no longer drive bloodthirsty personality changes.
-- NEW - Gradual, multi-day personality shifts: traits no longer flip in a single day. Evidence builds as "pressure" over several days, is resisted by steadfast traits (which also protect themselves from removal), and only fires once sustained - and an evaluation that calls a shift "unlikely" can no longer flip a trait at all.
-- NEW - Trait-change guardrails: only sanctioned traits can be added or removed (never, for example, Psychopath), at most one change per evaluation, with a cooldown between changes.
-- NEW - Mod settings sliders: trait-shift threshold and pressure decay, memory consolidation, abandonment risk, suicide damage, opinion/trust blend, and an evaluation cadence to cut LLM token cost.
-- Fixed: AI-driven mental breaks now actually fire (the request was previously left inert).
-- Fixed: therapy-session summaries are now kept as durable memories on both colonists instead of being discarded.
-- The daily evaluation now separates today from a lifetime of history, and the memory panel splits short vs long-term by real importance.
-
---- Changelog (v0.7.0) - Regions and Territories Compatibility ---
-- Moves in step with RimSynapse Core v0.7.0.
-- Requires Core v0.7.0; saves and settings carry over unchanged.
+--- Changelog (v0.9.0) - Prisoner Minds and Linked Memories ---
+- NEW - Psychological profiles for prisoners, slaves and guests: captives and visitors staying under your roof now think, evaluate and speak as themselves instead of sharing one blank register - the foundation warden conversations build on.
+- Changed: event and death memories now key their subject on Core 0.9's canonical pawn id, so a colonist's memories about someone truly link up - chit-chat about a pawn consolidates with their later death, as it always should have.
+- Requires RimSynapse Core v0.9.0.
 
 Full version history: https://github.com/RimSynapse/Psychology/wiki/Changelog
 

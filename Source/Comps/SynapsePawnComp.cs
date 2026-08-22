@@ -152,8 +152,13 @@ namespace RimSynapse.Psychology.Comps
 
             if (parent is Pawn pawn && pawn.Spawned && !pawn.Dead)
             {
-                // Async Backstory Stub
-                if (!hasBackstoryMemory && pawn.Faction == Faction.OfPlayer && !isGeneratingBackstory)
+                // Async Backstory Stub — generate a full psychological profile for everyone the colony
+                // actually has a relationship with (colonists, prisoners, slaves, staying guests), not
+                // player-faction alone (#63). We reuse the SAME colony-relevance gate the nightly clinical
+                // review uses, so raiders and passing traders never cost an LLM call and the two systems
+                // agree on who counts. The profile's framing adapts to the pawn's standing (see the prompts).
+                if (!hasBackstoryMemory && !isGeneratingBackstory
+                    && RimSynapse.Psychology.API.SynapsePsychology.IsEligibleForReview(pawn))
                 {
                     ticksToGenerateBackstory -= 250;
                     if (ticksToGenerateBackstory <= 0)
@@ -300,7 +305,10 @@ namespace RimSynapse.Psychology.Comps
                 yield return gizmo;
             }
 
-            if (parent is Pawn pawn && pawn.Faction == Faction.OfPlayer)
+            // Show the Psychology gizmo wherever a profile is generated (#63): colonists, and now
+            // prisoners, slaves and staying guests too — so a captured pawn's generated profile is
+            // actually viewable. Raiders/passing visitors don't qualify, so they get no button.
+            if (parent is Pawn pawn && RimSynapse.Psychology.API.SynapsePsychology.IsEligibleForReview(pawn))
             {
                 yield return new Command_Action
                 {

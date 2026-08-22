@@ -63,7 +63,7 @@ You MUST respond in valid JSON:
   ""EmotionalTone"": ""bittersweet""
 }";
 
-            string userMessage = $@"Colonist: {pawn.Name.ToStringShort}
+            string userMessage = $@"{ColonyRoleLabel(pawn)}: {pawn.Name.ToStringShort}
 Gender: {pawn.gender}
 Faction Background: {factionType}
 Childhood Backstory: ""{childhoodTitle}""
@@ -179,7 +179,7 @@ You MUST respond in valid JSON:
   ""EmotionalTone"": ""determined""
 }";
 
-            string userMessage = $@"Colonist: {pawn.Name.ToStringShort}
+            string userMessage = $@"{ColonyRoleLabel(pawn)}: {pawn.Name.ToStringShort}
 Gender: {pawn.gender}
 Adulthood Backstory: ""{adulthoodTitle}""
 Vanilla Description: ""{adulthoodDesc}""
@@ -274,7 +274,7 @@ OUTPUT FORMAT:
    - Jungian Type (MBTI: e.g., ENFP, INTJ, INFJ, ESTP)
    - Core Archetype (e.g., Caregiver, Outlaw, Creator, Sage, Ruler, Hero, Explorer, Jester)
    - Temperament (e.g., Sanguine, Melancholic, Phlegmatic, Choleric)
-3. [FIRST_IMPRESSION] — A detailed 2-3 sentence narrative memory of the pawn's arrival at the colony. Written in the third person perspective (using their name or ""he/she"", never ""I"" or ""my""). This should connect their background, childhood dreams, and aspirations to their landing context (e.g. waking from cryosleep).
+3. [FIRST_IMPRESSION] — A detailed 2-3 sentence narrative memory of how this pawn came to be at the colony. Written in the third person perspective (using their name or ""he/she"", never ""I"" or ""my""). Ground it in the 'Current situation' below — a colonist's hopeful landing, a prisoner being brought in bound, a slave's subjugation, or a guest's visit read very differently. Connect their background and disposition to that concrete circumstance; do NOT assume a hopeful arrival unless the situation says so.
 4. [VOICE] — How this pawn SPEAKS, so their dialogue sounds distinct from everyone else. Provide:
    - style: how they talk — sentence length, diction, humour, verbal tics, what they avoid saying
    - pace: one of slow | measured | fast
@@ -290,10 +290,11 @@ You MUST respond in valid JSON:
   ""FirstImpression"": ""Fred stepped out of cryosleep after decades in the void. Though this harsh desert outpost was far from the lush forest worlds of his childhood dreams, he was resolved to make it his home and build something lasting.""
 }";
 
-            string userMessage = $@"Colonist: {pawn.Name.ToStringShort}
+            string userMessage = $@"{ColonyRoleLabel(pawn)}: {pawn.Name.ToStringShort}
 Gender: {pawn.gender}
 Age: {pawn.ageTracker?.AgeBiologicalYears ?? 0}
 Current Traits: {traits}
+Current situation: {ArrivalSituation(pawn)}
 
 {memoriesContext}{crossModContext}
 Synthesize their psychological profile.";

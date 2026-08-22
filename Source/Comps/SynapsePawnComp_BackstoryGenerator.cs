@@ -60,6 +60,31 @@ namespace RimSynapse.Psychology.Comps
             }
         }
 
+        /// <summary>
+        /// Debug hook (#63): force the full profile pipeline to run for this pawn right now, bypassing
+        /// the colony-relevance gate — so a prisoner, slave, guest (or even a raider, for the exclusion
+        /// test) can be exercised on demand. Resets prior backstory state so it regenerates cleanly.
+        /// Generation is async; inspect the result afterwards with the "Dump personality"/"Dump voice"
+        /// debug actions.
+        /// </summary>
+        public void DebugForceProfile(Pawn pawn)
+        {
+            if (pawn == null) return;
+            hasBackstoryMemory = false;
+            isGeneratingBackstory = false;
+            ticksToGenerateBackstory = 0;
+            var coreComp = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
+            if (coreComp != null)
+            {
+                // Clear the pieces the pipeline branches on so every step (childhood → adulthood →
+                // personality → voice) re-runs rather than short-circuiting on stale data.
+                coreComp.memories?.RemoveAll(m => m.memoryType == "BackstoryChildhood" || m.memoryType == "BackstoryAdulthood");
+                coreComp.personalitySummary = null;
+                coreComp.voiceGenerated = false;
+            }
+            GenerateAIBackstory(pawn);
+        }
+
         // ────────────────────────────────────────────────────────
         //  Finalization
         // ────────────────────────────────────────────────────────
@@ -106,6 +131,18 @@ namespace RimSynapse.Psychology.Comps
                 BuildDynamicBackstory(pawn, coreComp);
             }
 
+            // Only colonists announce their backstory with a letter. Prisoners, slaves and guests now
+            // generate a full profile too (#63), but a "Backstory Discovered" letter for every captured
+            // raider would be spam — their profile is generated silently and viewable on their Psychology
+            // tab. The celebratory reveal stays a colonist moment.
+            if (!pawn.IsColonist)
+            {
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"[RimSynapse-Psychology] Profile generated for non-colonist {pawn.Name.ToStringShort} " +
+                    $"({ColonyRoleLabel(pawn)}) — no letter; viewable on their Psychology tab.");
+                return;
+            }
+
             string title = "Backstory Discovered";
             string text = $"{pawn.Name.ToStringShort} has shared their backstory with you.\n\n" +
                           "Open their Psychology tab to learn more about their past and personality traits.";
@@ -120,6 +157,44 @@ namespace RimSynapse.Psychology.Comps
                 ID = Find.UniqueIDsManager.GetNextLetterID()
             };
             Find.LetterStack.ReceiveLetter(letter);
+        }
+
+        // ────────────────────────────────────────────────────────
+        //  Utility: Colony-standing framing for profile prompts (#63)
+        // ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// How the prompt should address this pawn, given their standing relative to the player's
+        /// colony. A captive must NOT be written up as "Colonist" — their situation frames the
+        /// profile (and especially the arrival first-impression). Mirrors the IsEligibleForReview
+        /// population: colonists, prisoners, slaves, and staying guests (quest lodgers).
+        /// </summary>
+        private static string ColonyRoleLabel(Pawn pawn)
+        {
+            if (pawn.IsSlaveOfColony) return "Slave of the colony";
+            if (pawn.IsPrisonerOfColony) return "Prisoner of the colony";
+            if (pawn.IsColonist) return "Colonist";
+            if (pawn.IsQuestLodger()) return "Guest of the colony";
+            return "Newcomer to the colony";
+        }
+
+        /// <summary>
+        /// A concrete instruction for the arrival first-impression, so a prisoner's "arrival" is being
+        /// brought in bound and locked away — not a hopeful landing. The identity memories (childhood /
+        /// adulthood) are the same regardless of current standing; only the arrival differs, which is
+        /// why the profile is generated once at first eligibility and NOT regenerated on status change.
+        /// </summary>
+        private static string ArrivalSituation(Pawn pawn)
+        {
+            if (pawn.IsSlaveOfColony)
+                return "They are held by the colony as a SLAVE. The arrival is the moment they were taken, sold, or subjugated into bondage here — not a chosen landing. Reflect their captivity and whether they are defiant, broken, or biding their time.";
+            if (pawn.IsPrisonerOfColony)
+                return "They are a PRISONER of the colony. The arrival is being brought in — often wounded or bound — and locked in a cell, not a hopeful landing. Reflect their captivity and how they regard their captors.";
+            if (pawn.IsColonist)
+                return "They joined the colony as a member. The arrival is their landing or recruitment (e.g. waking from cryosleep, walking in from the wastes) and the resolve to make a life here.";
+            if (pawn.IsQuestLodger())
+                return "They are a GUEST staying with the colony for a time. The arrival is their coming to stay as a visitor rather than a member — with their own reasons for being here and somewhere else to return to.";
+            return "They have recently come to the colony.";
         }
 
         // ────────────────────────────────────────────────────────
