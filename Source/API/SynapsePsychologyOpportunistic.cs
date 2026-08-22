@@ -125,9 +125,10 @@ You MUST respond strictly in valid JSON:
                                             decayRate = Convert.ToSingle(memDict["Decay"]), // class-driven decay applies the multiplier at decay time
                                             tags = tagsList,
                                             memoryType = "EventReflection",
-                                            subjectPawnIds = pastEvent.involvedPawnIds != null
-                                                ? new List<string>(pastEvent.involvedPawnIds)
-                                                : new List<string>(),
+                                            // Key the subject on Core's canonical scheme (GetUniqueLoadID),
+                                            // not the ThingID in involvedPawnIds — so this memory consolidates
+                                            // with other memories about the same pawn (Core #80).
+                                            subjectPawnIds = ResolveSubjectLoadIds(pastEvent, pawns),
                                             absTick = SynapseDateHelper.GameTickToAbsTick(pastEvent.gameTick),
                                             gameTick = pastEvent.gameTick
                                         });
@@ -170,6 +171,30 @@ You MUST respond strictly in valid JSON:
                 if (p != null) return p;
             }
             return null;
+        }
+
+        /// <summary>
+        /// The canonical subject ids for a memory about this event (Core #80): prefer the
+        /// GetUniqueLoadID list Core captured at event time (works even when the subject is dead and
+        /// despawned), fall back to resolving the ThingID list against live pawns via Core's
+        /// canonical scheme. Core owns the scheme; this producer just leverages it.
+        /// </summary>
+        private static List<string> ResolveSubjectLoadIds(PastEvent pastEvent, List<Pawn> livePawns)
+        {
+            if (pastEvent?.involvedPawnLoadIds != null && pastEvent.involvedPawnLoadIds.Count > 0)
+                return new List<string>(pastEvent.involvedPawnLoadIds);
+
+            var ids = new List<string>();
+            if (pastEvent?.involvedPawnIds != null)
+            {
+                foreach (var thingId in pastEvent.involvedPawnIds)
+                {
+                    Pawn p = livePawns?.FirstOrDefault(x => x.ThingID == thingId) ?? PawnById(thingId);
+                    string id = RimSynapse.Comps.SynapseCorePawnComp.MemoryPawnId(p);
+                    if (!string.IsNullOrEmpty(id) && !ids.Contains(id)) ids.Add(id);
+                }
+            }
+            return ids;
         }
 
         private static string PronounsFor(Pawn p)
