@@ -98,19 +98,20 @@ namespace RimSynapse.Psychology.UI
             trajHeight += (traj.Count == 0 ? 22f : 0f) + 20f;
             totalFormHeight += trajHeight;
             
-            // Calculate Patient History height
-            var historyMemories = coreComp.memories.Where(m => m.tags != null && m.tags.Contains("TraitShift")).OrderBy(m => m.absTick).ToList();
+            // Calculate Patient History height — the full trait timeline: AI-engine gains/losses (#25)
+            // merged with therapy/desensitization changes, in one chronological list.
+            var timeline = BuildTraitTimeline(coreComp, pawnComp, pawn);
             totalFormHeight += 22f + 10f; // Header
-            if (historyMemories.Count == 0)
+            if (timeline.Count == 0)
             {
                 totalFormHeight += Text.CalcHeight("No major psychological changes recorded.", rect.width - 30f) + 20f;
             }
             else
             {
-                foreach (var m in historyMemories)
+                foreach (var e in timeline)
                 {
-                    string dateStr = GenDate.DateFullStringAt(m.absTick, Find.WorldGrid.LongLatOf(pawn.Tile));
-                    string entry = $"[{dateStr}] {m.summary}";
+                    string dateStr = GenDate.DateFullStringAt(e.absTick, Find.WorldGrid.LongLatOf(pawn.Tile));
+                    string entry = $"[{dateStr}] {e.text}";
                     totalFormHeight += Text.CalcHeight(entry, rect.width - 30f) + 5f;
                 }
                 totalFormHeight += 20f;
@@ -250,7 +251,7 @@ namespace RimSynapse.Psychology.UI
             GUI.color = Color.white;
             formY += 22f;
             
-            if (historyMemories.Count == 0)
+            if (timeline.Count == 0)
             {
                 float textHeight = Text.CalcHeight("No major psychological changes recorded.", viewRect.width);
                 Rect valRect = new Rect(rect.x, formY, viewRect.width, textHeight);
@@ -259,10 +260,10 @@ namespace RimSynapse.Psychology.UI
             }
             else
             {
-                foreach (var m in historyMemories)
+                foreach (var e in timeline)
                 {
-                    string dateStr = GenDate.DateFullStringAt(m.absTick, Find.WorldGrid.LongLatOf(pawn.Tile));
-                    string entry = $"[{dateStr}] {m.summary}";
+                    string dateStr = GenDate.DateFullStringAt(e.absTick, Find.WorldGrid.LongLatOf(pawn.Tile));
+                    string entry = $"[{dateStr}] {e.text}";
                     float entryHeight = Text.CalcHeight(entry, viewRect.width);
                     Widgets.Label(new Rect(rect.x, formY, viewRect.width, entryHeight), entry);
                     formY += entryHeight + 5f;
@@ -273,6 +274,56 @@ namespace RimSynapse.Psychology.UI
             Widgets.DrawLineHorizontal(rect.x, formY, viewRect.width);
             
             Widgets.EndScrollView();
+        }
+
+        private struct TimelineRow { public long absTick; public string text; }
+
+        /// <summary>
+        /// The full Patient History timeline (#25): every AI-engine trait gain and loss — with the reasoning
+        /// captured at each end of the trait's life — merged with the therapy/desensitization "TraitShift"
+        /// memories, ordered oldest-first. Trait-engine records store game ticks, so they are lifted to
+        /// absolute ticks to share one clock with the memories. Exact duplicates are dropped defensively
+        /// (the two sources are disjoint today, but the guard keeps the view clean if that ever changes).
+        /// </summary>
+        private System.Collections.Generic.List<TimelineRow> BuildTraitTimeline(
+            RimSynapse.Comps.SynapseCorePawnComp coreComp, SynapsePawnComp pawnComp, Pawn pawn)
+        {
+            var rows = new System.Collections.Generic.List<TimelineRow>();
+
+            if (pawnComp?.dynamicTraits != null)
+            {
+                foreach (var t in pawnComp.dynamicTraits)
+                {
+                    if (t.traitDef == null) continue;
+                    string label = t.traitDef.LabelCap.ToString();
+                    if (string.IsNullOrEmpty(label)) label = t.traitDef.label;
+                    rows.Add(new TimelineRow
+                    {
+                        absTick = RimSynapse.Utils.SynapseDateHelper.GameTickToAbsTick(t.tickAdded),
+                        text = $"Gained '{label}'" + (string.IsNullOrEmpty(t.reason) ? "" : $" — {t.reason}")
+                    });
+                    if (t.tickRemoved > 0)
+                    {
+                        rows.Add(new TimelineRow
+                        {
+                            absTick = RimSynapse.Utils.SynapseDateHelper.GameTickToAbsTick(t.tickRemoved),
+                            text = $"Lost '{label}'" + (string.IsNullOrEmpty(t.removalReason) ? "" : $" — {t.removalReason}")
+                        });
+                    }
+                }
+            }
+
+            if (coreComp?.memories != null)
+            {
+                foreach (var m in coreComp.memories)
+                    if (m.tags != null && m.tags.Contains("TraitShift"))
+                        rows.Add(new TimelineRow { absTick = m.absTick, text = m.summary });
+            }
+
+            var seen = new System.Collections.Generic.HashSet<string>();
+            return rows.OrderBy(r => r.absTick)
+                       .Where(r => seen.Add(r.absTick + "|" + r.text))
+                       .ToList();
         }
 
         private struct TrajEntry { public string text; public string flavor; public float frac; public Color col; }

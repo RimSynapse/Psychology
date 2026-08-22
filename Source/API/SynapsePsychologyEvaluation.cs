@@ -282,10 +282,13 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
                 }
             }
 
+            // Only traits the pawn STILL holds — the list now keeps closed-out (removed) records too (#25),
+            // and a lost trait is not one they "currently have".
+            var activeDynamic = pawnComp.dynamicTraits.Where(t => t.IsActive).ToList();
             string dynamicTraitsStr = "None";
-            if (pawnComp.dynamicTraits.Count > 0)
+            if (activeDynamic.Count > 0)
             {
-                dynamicTraitsStr = string.Join(", ", pawnComp.dynamicTraits.Select(t => $"{t.traitDef.defName} (Added {((Find.TickManager.TicksGame - t.tickAdded)/60000f):F1} days ago for: {t.reason})"));
+                dynamicTraitsStr = string.Join(", ", activeDynamic.Select(t => $"{t.traitDef.defName} (Added {((Find.TickManager.TicksGame - t.tickAdded)/60000f):F1} days ago for: {t.reason})"));
             }
             systemPrompt = systemPrompt.Replace("{DYNAMIC_TRAITS}", dynamicTraitsStr);
 

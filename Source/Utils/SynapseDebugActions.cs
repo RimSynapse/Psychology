@@ -416,6 +416,33 @@ namespace RimSynapse.Psychology.Utils
             RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Reset trait-engine state for {p.LabelShort}.");
         }
 
+        /// <summary>#25: apply a dynamic trait then remove it and dump the lifecycle — proving the record
+        /// is CLOSED OUT (tickRemoved + removalReason) rather than deleted, so both the gain and the loss
+        /// survive with their reasoning for the Patient History timeline. Open the Psychology tab afterward
+        /// to see both entries rendered chronologically.</summary>
+        [DebugAction("RimSynapse", "Timeline: Dynamic-trait gain+loss round-trip (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void TraitTimelineRoundTrip(Pawn p)
+        {
+            if (p == null) return;
+            var comp = p.TryGetComp<SynapsePawnComp>();
+            if (comp == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no SynapsePawnComp."); return; }
+
+            const string td = "Synapse_Aversion_Intellectual"; // an engine trait a pawn won't normally carry
+            SynapsePsychology.ApplyTraitDirective(p, td, true, "debug: weeks in the fields soured them on the research bench");
+            SynapsePsychology.ApplyTraitDirective(p, td, false, "debug: a breakthrough rekindled their curiosity");
+
+            var recs = comp.dynamicTraits.Where(r => r.traitDef?.defName == td).ToList();
+            RimSynapse.SynapseLogger.Info("psychology", $"--- Trait timeline round-trip for {p.LabelShort}: {recs.Count} record(s) for {td} ---");
+            foreach (var r in recs)
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"  {r.traitDef.defName}: gained@{r.tickAdded} \"{r.reason}\""
+                    + (r.IsActive ? "  [ACTIVE]" : $"  |  lost@{r.tickRemoved} \"{r.removalReason}\""));
+            int active = comp.dynamicTraits.Count(r => r.IsActive);
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"  History preserved: record NOT deleted on removal; {active} active / {comp.dynamicTraits.Count} total. " +
+                "Open the Psychology tab → Patient History to see the gain and loss on the timeline.");
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpVoice(Pawn p)
         {

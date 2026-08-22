@@ -355,7 +355,11 @@ namespace RimSynapse.Psychology.API
             var comp = pawn.TryGetComp<SynapsePawnComp>();
             if (comp?.dynamicTraits == null || comp.dynamicTraits.Count == 0) return false;
             int now = Find.TickManager.TicksGame;
-            return comp.dynamicTraits.Any(d => now - d.tickAdded < ShiftCooldownTicks);
+            // A recent gain OR a recent removal both count as a shift for the cooldown — closed-out records
+            // now linger in the list (#25), so gate on whichever end of the trait's life is most recent.
+            return comp.dynamicTraits.Any(d =>
+                now - d.tickAdded < ShiftCooldownTicks
+                || (d.tickRemoved > 0 && now - d.tickRemoved < ShiftCooldownTicks));
         }
 
         /// <summary>Apply/refresh the growing-unease mood modifier at a stage scaled to how close to a shift the pawn is.</summary>
