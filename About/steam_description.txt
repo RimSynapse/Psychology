@@ -1,5 +1,5 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
-[b]Version:[/b] v0.8.0 (Target: RimWorld 1.6)
+[b]Version:[/b] v0.9.0 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Psychology[/h1]
 [b][url=https://github.com/RimSynapse/Psychology/wiki]Official Wiki and Documentation[/url][/b]
@@ -20,27 +20,11 @@ These ship when they are ready - no dates.
 
 ---
 
-[h2]Changelog (v0.8.0) - Living Traits, Voice and Clinical Insight[/h2]
+[h2]Changelog (v0.9.0) - Prisoner Minds and Linked Memories[/h2]
 [list]
-[*] NEW - Living traits: a colonist's personality now drifts from what they actually do and live through, weighed by an LLM judge and narrated back to you, with a feedback loop that learns as it goes.
-[*] NEW - Kindness and abrasiveness now register as social signals, feeding new affinity and devotion between colonists - and pawns pushed past their limits develop graduated aversions and their own ways of coping.
-[*] NEW - "Forming Traits" view: the pawn's Psychology window now shows which traits are drifting and where they are heading, with new sliders in mod settings to tune how fast personalities change.
-[*] NEW - Pawn Voice: Psychology now writes each colonist's narrative voice - their turn of phrase plus a spoken Kokoro voice - so they sound like themselves.
-[*] NEW - Colonists now form a memory of the day they arrived, and Psychology plugs into Core 0.8's shared context hooks so other modules can read a pawn's state.
-[*] Changed: the clinical evaluation is rebuilt into five dynamic sections with at-a-glance warning badges, and now covers only pawns affiliated with your colony.
-[*] Changed: episode narration only speaks up when a pawn was actually involved, uses the right pronouns, and runs as long as the moment deserves.
-[*] Performance: smoothed out the mental-break manager and trimmed hot-path costs for less stutter.
-[/list]
-
-[h2]Changelog (v0.7.1) - Gradual personality and smarter memory[/h2]
-[list]
-[*] Fixed the headline bug: a colonist could gain Bloodlust and lose a steadfast trait just from repeatedly attacking an object (like a wrecked vehicle). Violence against inert objects is now clearly distinguished from harming the living and can no longer drive bloodthirsty personality changes.
-[*] NEW - Gradual, multi-day personality shifts: traits no longer flip in a single day. Evidence builds as "pressure" over several days, is resisted by steadfast traits (which also protect themselves from removal), and only fires once sustained - and an evaluation that calls a shift "unlikely" can no longer flip a trait at all.
-[*] NEW - Trait-change guardrails: only sanctioned traits can be added or removed (never, for example, Psychopath), at most one change per evaluation, with a cooldown between changes.
-[*] NEW - Mod settings sliders: trait-shift threshold and pressure decay, memory consolidation, abandonment risk, suicide damage, opinion/trust blend, and an evaluation cadence to cut LLM token cost.
-[*] Fixed: AI-driven mental breaks now actually fire (the request was previously left inert).
-[*] Fixed: therapy-session summaries are now kept as durable memories on both colonists instead of being discarded.
-[*] The daily evaluation now separates today from a lifetime of history, and the memory panel splits short vs long-term by real importance.
+[*] NEW - Psychological profiles for prisoners, slaves and guests: captives and visitors staying under your roof now think, evaluate and speak as themselves instead of sharing one blank register - the foundation warden conversations build on.
+[*] Changed: event and death memories now key their subject on Core 0.9's canonical pawn id, so a colonist's memories about someone truly link up - chit-chat about a pawn consolidates with their later death, as it always should have.
+[*] Requires RimSynapse Core v0.9.0.
 [/list]
 
 [b]Full version history:[/b] [url=https://github.com/RimSynapse/Psychology/wiki/Changelog]github.com/RimSynapse/Psychology/wiki[/url]
