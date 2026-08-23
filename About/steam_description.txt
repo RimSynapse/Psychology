@@ -1,5 +1,5 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
-[b]Version:[/b] v0.9.0 (Target: RimWorld 1.6)
+[b]Version:[/b] v0.9.1 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Psychology[/h1]
 [b][url=https://github.com/RimSynapse/Psychology/wiki]Official Wiki and Documentation[/url][/b]
@@ -20,11 +20,17 @@ These ship when they are ready - no dates.
 
 ---
 
+[h2]Changelog (v0.9.1) - Core 0.9.1 Compatibility[/h2]
+[list]
+[*] Fixed: rebuilt against RimSynapse Core 0.9.1. Psychology 0.9.0's assembly could fail to load against Core 0.9.1 with a Prepatcher type-load error - this build resolves cleanly against the current Core.
+[*] Fixed: Psychology now reports its true version to Core's compatibility registry, which had been stuck reporting an old build number.
+[*] Requires RimSynapse Core v0.9.1.
+[/list]
+
 [h2]Changelog (v0.9.0) - Prisoner Minds and Linked Memories[/h2]
 [list]
 [*] NEW - Psychological profiles for prisoners, slaves and guests: captives and visitors staying under your roof now think, evaluate and speak as themselves instead of sharing one blank register - the foundation warden conversations build on.
 [*] Changed: event and death memories now key their subject on Core 0.9's canonical pawn id, so a colonist's memories about someone truly link up - chit-chat about a pawn consolidates with their later death, as it always should have.
-[*] Requires RimSynapse Core v0.9.0.
 [/list]
 
 [b]Full version history:[/b] [url=https://github.com/RimSynapse/Psychology/wiki/Changelog]github.com/RimSynapse/Psychology/wiki[/url]
