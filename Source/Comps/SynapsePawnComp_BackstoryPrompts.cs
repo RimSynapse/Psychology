@@ -386,23 +386,35 @@ Synthesize their psychological profile.";
         public void DeriveVoiceProfile(Pawn pawn, RimSynapse.Comps.SynapseCorePawnComp coreComp)
         {
             if (coreComp == null || isGeneratingVoice) return;
-            isGeneratingVoice = true;
+            BeginVoiceGen();
 
             // Base voice is deterministic — assign now so even a failed LLM derive leaves a usable voice.
             if (string.IsNullOrEmpty(coreComp.kokoroVoice) || !KokoroVoices.IsKnown(coreComp.kokoroVoice))
                 coreComp.kokoroVoice = KokoroVoices.RandomVoiceFor(pawn);
 
             string traits = string.Join(", ", pawn.story?.traits?.allTraits?.Select(t => t.Label) ?? Enumerable.Empty<string>());
-            string psych = coreComp.llmTraits != null ? string.Join(", ", coreComp.llmTraits) : "none";
+            string psych = coreComp.llmTraits != null && coreComp.llmTraits.Count > 0 ? string.Join(", ", coreComp.llmTraits) : "none";
 
-            string systemPrompt = @"From a colonist's personality, define how they SPEAK so their dialogue sounds distinct. Respond in valid JSON:
+            // Colony members derive from their synthesized personality. Non-member visitors (#41) have no
+            // clinical profile, so ground their voice in vanilla data instead — their backstory titles —
+            // rather than sending an empty personality line. Either way the model gets enough to voice them.
+            string personality = coreComp.personalitySummary;
+            if (string.IsNullOrWhiteSpace(personality))
+            {
+                string childhood = pawn.story?.Childhood?.title;
+                string adulthood = pawn.story?.Adulthood?.title;
+                personality = string.Join("; ", new[] { childhood, adulthood }.Where(s => !string.IsNullOrWhiteSpace(s)));
+                if (string.IsNullOrWhiteSpace(personality)) personality = "an ordinary traveller of the rim";
+            }
+
+            string systemPrompt = @"From a person's traits and background, define how they SPEAK so their dialogue sounds distinct. Respond in valid JSON:
 { ""style"": ""how they talk: sentence length, diction, humour, verbal tics, what they avoid saying"",
   ""pace"": ""slow|measured|fast"",
   ""timbre"": ""warm|gruff|bright|flat|breathy|clipped"" }";
-            string userMessage = $@"Colonist: {pawn.Name.ToStringShort}
+            string userMessage = $@"Person: {pawn.Name.ToStringShort}
 Traits: {traits}
 Psychology: {psych}
-Personality: {coreComp.personalitySummary}";
+Background: {personality}";
 
             var options = new ChatOptions { priority = 5, requestName = "Voice Profile", targetName = pawn.Name.ToStringShort };
             SynapseClient.PromptAsync(
@@ -437,9 +449,13 @@ Personality: {coreComp.personalitySummary}";
             }
             finally
             {
-                // Mark generated even on failure (base voice is assigned) so we don't retry forever.
-                coreComp.voiceGenerated = true;
+                // Release the in-flight guard. We do NOT force voiceGenerated=true here: a successful
+                // parse already set it (via ApplyVoiceProfile), and on failure we WANT the bounded
+                // backfill to retry rather than lock in an empty voiceProfile. The deterministic base
+                // Kokoro voice was assigned up front, so TTS is never left without a voice regardless.
+                // Runaway is bounded by MaxVoiceBackfillTries, not by this flag.
                 isGeneratingVoice = false;
+                voiceGuardTick = -1;
             }
         }
     }

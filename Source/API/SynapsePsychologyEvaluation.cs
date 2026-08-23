@@ -129,6 +129,23 @@ namespace RimSynapse.Psychology.API
             return pawn.IsColonist || pawn.IsPrisonerOfColony || pawn.IsSlaveOfColony || pawn.IsQuestLodger();
         }
 
+        /// <summary>
+        /// Who gets a VOICE (Conversations#33, forward-looking for #41). A superset of
+        /// <see cref="IsEligibleForReview"/>: everyone the colony has a relationship with (they already get
+        /// a voice as part of their full profile), PLUS non-hostile humanlikes present on a player map —
+        /// traders, friendly-faction visitors, wanderers — who may become conversation participants (#41).
+        /// Still excludes anyone hostile to the player (a raider mid-assault won't be chatted with). A voice
+        /// is far cheaper than the clinical pipeline — one low-priority prompt, no nightly reviews — so the
+        /// wider net is affordable; visitors get a voice derived from vanilla data, NOT a clinical profile.
+        /// </summary>
+        public static bool IsEligibleForVoice(Pawn pawn)
+        {
+            if (pawn == null || !pawn.RaceProps.Humanlike || pawn.Dead) return false;
+            if (IsEligibleForReview(pawn)) return true;
+            if (pawn.HostileTo(Faction.OfPlayer)) return false;
+            return pawn.Spawned && pawn.Map != null && pawn.Map.IsPlayerHome;
+        }
+
         public static void QueueDailyPsychologyReview(Pawn pawn, float averageMood, System.Collections.Generic.List<RimSynapse.Models.WeightedMemory> dailyEvents, Action<bool> onComplete = null, bool isOpportunistic = false)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();

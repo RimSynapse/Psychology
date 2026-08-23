@@ -14,6 +14,18 @@ namespace RimSynapse.Psychology.Comps
     /// </summary>
     public static class VoiceProfileBuilder
     {
+        /// <summary>
+        /// The voice backfill trigger: a pawn NEEDS a voiceProfile derived iff it has a personalitySummary
+        /// to derive from but no voiceProfile yet. Deliberately keyed on an EMPTY voiceProfile rather than
+        /// the voiceGenerated flag — the personality-profile step sets voiceGenerated=true even when the
+        /// model omits the Voice block, which used to strand such pawns voiceless (Conversations#33). One
+        /// predicate shared by CompTick and the tests so the contract is exercised deterministically.
+        /// </summary>
+        public static bool NeedsVoiceBackfill(SynapseCorePawnComp core)
+            => core != null
+               && string.IsNullOrWhiteSpace(core.voiceProfile)   // matches ApplyVoiceProfile's own emptiness test
+               && !string.IsNullOrEmpty(core.personalitySummary);
+
         /// <summary>Assign/refresh a pawn's voice fields from parsed Voice descriptors. Idempotent;
         /// always leaves a valid base <c>kokoroVoice</c> and sets <c>voiceGenerated</c>.</summary>
         public static void ApplyVoiceProfile(Pawn pawn, SynapseCorePawnComp core, string style, string pace, string timbre)

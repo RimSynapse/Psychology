@@ -98,6 +98,35 @@ namespace RimSynapse.Psychology.Tests
                 }
             });
 
+            // Voice backfill trigger (Conversations#33): the fix that keeps voiceProfile from stranding.
+            // The personality-profile step sets voiceGenerated=true even when the model omits the Voice
+            // block (the quicktest mock does exactly this), leaving voiceProfile empty — so the backfill
+            // MUST key on an empty voiceProfile, not on voiceGenerated. This pins that contract.
+            yield return new SynapseTestCase("Psychology_VoiceBackfillTriggersOnEmptyProfile", () =>
+            {
+                var c = new SynapseCorePawnComp();
+
+                // No personality yet -> nothing to derive from -> do not backfill.
+                Assert.False(VoiceProfileBuilder.NeedsVoiceBackfill(c), "no personalitySummary => no backfill");
+
+                // The exact stranded state after a Voice-less profile response: personality present,
+                // voiceGenerated flipped true, but voiceProfile still empty. This MUST trigger a backfill.
+                c.personalitySummary = "A quiet, pragmatic survivor.";
+                c.voiceGenerated = true;
+                c.voiceProfile = null;
+                Assert.True(VoiceProfileBuilder.NeedsVoiceBackfill(c),
+                    "personality present + empty voiceProfile (voiceGenerated=true) must still backfill");
+
+                // Once a real style lands, the trigger clears — no perpetual re-derive.
+                c.voiceProfile = "Terse and dry; clipped sentences.";
+                Assert.False(VoiceProfileBuilder.NeedsVoiceBackfill(c), "a populated voiceProfile stops the backfill");
+
+                // Whitespace-only is treated as empty, so it re-triggers rather than passing as authored.
+                c.voiceProfile = "   ";
+                Assert.True(VoiceProfileBuilder.NeedsVoiceBackfill(c), "whitespace-only voiceProfile counts as empty");
+                return "backfill triggers on empty/whitespace voiceProfile, not on the voiceGenerated flag";
+            });
+
             // Each WorkDomain resolves to a graduated distaste SPECTRUM (no hard block) and a separate
             // terminal INCAPABLE trait that DOES disable the work type, plus a real WorkTypeDef.
             yield return new SynapseTestCase("Psychology_SkillAxisMap_AversionFamilyResolves", () =>
