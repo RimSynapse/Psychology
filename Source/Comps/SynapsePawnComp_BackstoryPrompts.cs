@@ -38,46 +38,18 @@ namespace RimSynapse.Psychology.Comps
             // Allow Core/Factions to inject extra context (like Ideology)
             string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.BackstoryChildhood);
 
-            string systemPrompt = @"You are writing a vivid third-person memory for a colonist in the RimWorld universe, as if the AI Storyteller is describing their childhood.
-This memory is from their CHILDHOOD. It should be a specific, concrete scene — not a summary.
-
-RULES:
-- Write 100-200 words, third person (using their name or ""he/she"", never ""I"" or ""my"")
-- This is a SINGLE vivid memory, not a life summary
-- Ground the memory in the skill bonuses: if they got +4 Mining, describe WHY through experience (e.g., ""Josema spent years chipping limestone..."")
-- If work types are disabled, hint at WHY (trauma, cultural taboo, physical limitation)
-- The memory should feel personal and emotionally resonant — a moment they'd actually remember
-- RimWorld setting: frontier planets, crashlanded survivors, tribal societies, harsh conditions
-- You MUST also generate a ""Hometown"" — their place of origin. This should match their background:
-  - Outlander/Settler → a named settlement or outpost (e.g., ""Kharstead"", ""Port Valen"")
-  - Tribal → a geographic feature, camp, or caravan route (e.g., ""the Redstone caravan"", ""the marshlands east of Sleeping Ridge"")
-  - Pirate → a ship, station, or raider den (e.g., ""the Rust Fang"", ""Scrapheap Station"")
-  - Imperial → a named city or estate (e.g., ""the Stellarch's court at Novium"")
-  - If their backstory implies they moved a lot or are orphaned, something vague is fine (""the roads between nowhere"")
-
-You MUST respond in valid JSON:
-{
-  ""Memory"": ""Josema remembered the first time he...(100-200 words)..."",
-  ""Hometown"": ""Kharstead"",
-  ""Tags"": [""Origin"", ""Childhood"", ""Mining""],
-  ""EmotionalTone"": ""bittersweet""
-}";
-
-            string userMessage = $@"{ColonyRoleLabel(pawn)}: {pawn.Name.ToStringShort}
-Gender: {pawn.gender}
-Faction Background: {factionType}
-Childhood Backstory: ""{childhoodTitle}""
-Vanilla Description: ""{childhoodDesc}""
-Skill Bonuses from Childhood: {skillBonuses}
-{(string.IsNullOrEmpty(disabledWork) ? "" : $"Disabled Work Types: {disabledWork}\n")}{factionContext}{crossModContext}
-Write a vivid childhood memory grounded in these skills.";
+            // Prompt authored once in the pure composer so the game-free Prompt Lab builds the exact same
+            // system+user pair without launching RimWorld.
+            var prompt = RimSynapse.Psychology.Prompts.ChildhoodMemoryPromptComposer.Compose(
+                ColonyRoleLabel(pawn), pawn.Name.ToStringShort, pawn.gender.ToString(), factionType,
+                childhoodTitle, childhoodDesc, skillBonuses, disabledWork, factionContext + crossModContext);
 
             var options = new ChatOptions { priority = 1, requestName = "Childhood Backstory", targetName = pawn.Name.ToStringShort };
 
             SynapseClient.PromptAsync(
                 RimSynapsePsychologyMod.ModHandle,
-                systemPrompt,
-                userMessage,
+                prompt.system,
+                prompt.user,
                 result => OnChildhoodMemoryGenerated(result, pawn, coreComp),
                 options
             );
@@ -395,20 +367,16 @@ Synthesize their psychological profile.";
             string traits = string.Join(", ", pawn.story?.traits?.allTraits?.Select(t => t.Label) ?? Enumerable.Empty<string>());
             string psych = coreComp.llmTraits != null ? string.Join(", ", coreComp.llmTraits) : "none";
 
-            string systemPrompt = @"From a colonist's personality, define how they SPEAK so their dialogue sounds distinct. Respond in valid JSON:
-{ ""style"": ""how they talk: sentence length, diction, humour, verbal tics, what they avoid saying"",
-  ""pace"": ""slow|measured|fast"",
-  ""timbre"": ""warm|gruff|bright|flat|breathy|clipped"" }";
-            string userMessage = $@"Colonist: {pawn.Name.ToStringShort}
-Traits: {traits}
-Psychology: {psych}
-Personality: {coreComp.personalitySummary}";
+            // Prompt authored once in the pure composer so the game-free Prompt Lab builds the exact same
+            // system+user pair without launching RimWorld.
+            var prompt = RimSynapse.Psychology.Prompts.VoiceProfilePromptComposer.Compose(
+                pawn.Name.ToStringShort, traits, psych, coreComp.personalitySummary);
 
             var options = new ChatOptions { priority = 5, requestName = "Voice Profile", targetName = pawn.Name.ToStringShort };
             SynapseClient.PromptAsync(
                 RimSynapsePsychologyMod.ModHandle,
-                systemPrompt,
-                userMessage,
+                prompt.system,
+                prompt.user,
                 result => OnVoiceProfileDerived(result, pawn, coreComp),
                 options
             );

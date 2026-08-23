@@ -113,8 +113,8 @@ namespace RimSynapse.Psychology.API
         // Confirmed extreme/major MentalStateDef defNames (NOT MentalBreakDefs — e.g. "Catatonic" is a
         // MentalBreakDef and would fail the MentalStateDef lookup, so it is deliberately excluded).
         // Exposed so a test can assert every candidate resolves — an invalid name silently no-ops the break.
-        public static readonly string[] BreakCandidates =
-            { "Berserk", "Slaughterer", "FireStartingSpree", "InsultingSpree", "Binging_Food", "Wander_Sad", "GiveUpExit" };
+        // Single-sourced in the pure composer so the game and the game-free Prompt Lab share the exact list.
+        public static readonly string[] BreakCandidates = RimSynapse.Psychology.Prompts.BreakPromptComposer.DefaultCandidates;
 
         /// <summary>
         /// Ask the LLM which mental break best fits this pawn's psychology as they cross the extreme
@@ -133,20 +133,17 @@ namespace RimSynapse.Psychology.API
                 ? string.Join(", ", pawn.story.traits.allTraits.Select(t => t.Label)) : "None";
             float mood = pawn.needs?.mood?.CurLevelPercentage ?? 0f;
 
-            string systemPrompt = $@"You are modelling a RimWorld colonist who has crossed their EXTREME mental-break threshold and is about to snap.
-Choose the single mental break their psychology, traits and burdens best justify, from this exact list of RimWorld MentalStateDef defNames:
-{string.Join(", ", BreakCandidates)}.
-Respond ONLY as valid JSON, no markdown:
-{{ ""BreakDefName"": ""<one defName from the list>"", ""Warning"": ""<1-2 sentence in-character warning of what is coming>"" }}";
-
-            string userMessage = $"Name: {pawn.Name.ToStringShort}\nMood: {mood:P0} (below the extreme break threshold)\nTraits: {traits}\nPsychological burdens: {burdens}";
+            // Prompt authored once in the pure composer so the game-free Prompt Lab builds the exact same
+            // system+user pair without launching RimWorld.
+            var prompt = RimSynapse.Psychology.Prompts.BreakPromptComposer.Compose(
+                pawn.Name.ToStringShort, mood, traits, burdens, BreakCandidates);
 
             var options = new ChatOptions { priority = 2, requestName = "Break Prediction", targetName = pawn.Name.ToStringShort };
 
             SynapseClient.PromptAsync(
                 RimSynapsePsychologyMod.ModHandle,
-                systemPrompt,
-                userMessage,
+                prompt.system,
+                prompt.user,
                 result =>
                 {
                     if (!result.success) return; // leave 'pending' — no spam; clears on mood recovery
