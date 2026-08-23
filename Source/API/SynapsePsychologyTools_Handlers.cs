@@ -89,7 +89,10 @@ namespace RimSynapse.Psychology.API
                             defName = t.traitDef?.defName,
                             label = t.traitDef?.LabelCap.ToString() ?? t.traitDef?.label,
                             reason = t.reason,
-                            tickAdded = t.tickAdded
+                            tickAdded = t.tickAdded,
+                            active = t.IsActive,
+                            tickRemoved = t.tickRemoved,
+                            removalReason = t.removalReason
                         }).ToList();
                     }
 

@@ -152,6 +152,11 @@ namespace RimSynapse.Psychology.Comps
 
             if (parent is Pawn pawn && pawn.Spawned && !pawn.Dead)
             {
+                // Unstick any async guard whose request was silently dropped (see SelfHealAsyncGuards):
+                // without this, one dropped request during map load would block backstory/voice
+                // generation for the rest of the session, leaving personalitySummary/voiceProfile empty.
+                SelfHealAsyncGuards(pawn);
+
                 // Async Backstory Stub — generate a full psychological profile for everyone the colony
                 // actually has a relationship with (colonists, prisoners, slaves, staying guests), not
                 // player-faction alone (#63). We reuse the SAME colony-relevance gate the nightly clinical
@@ -186,19 +191,35 @@ namespace RimSynapse.Psychology.Comps
                         // Re-run the SAME scoped profile pass (fits the small context window) — not a
                         // consolidated mega-call. Capped so a model that never returns valid JSON can't loop.
                         personalityBackfillTries++;
-                        isGeneratingBackstory = true;
+                        BeginBackstoryGen();
                         GeneratePersonalityProfile(pawn, coreForProfile);
                     }
                 }
 
-                // Voice backfill (#33): a pawn with a personality but no voice yet (e.g. a save predating
-                // voices) gets one derived once. New pawns get their voice with the profile itself.
-                if (hasBackstoryMemory && !isGeneratingVoice)
+                // Voice generation (#33, forward-looking for #41). Two populations, one cheap prompt each:
+                //   • Colony members: the full profile authors their voice, and this backfills it the moment
+                //     a personalitySummary exists but voiceProfile is still empty — we key on an EMPTY
+                //     voiceProfile, not the voiceGenerated flag (the profile step flips voiceGenerated=true
+                //     even when the model omits the Voice block, which used to strand them voiceless).
+                //   • Non-hostile visitors who may become conversation participants (#41): a voice derived
+                //     from vanilla data (traits + backstory), WITHOUT the clinical/personality pipeline —
+                //     so a passing trader can be voiced without paying the colony-member cost. Raiders and
+                //     other hostiles are excluded by IsEligibleForVoice.
+                // Bounded per session (MaxVoiceBackfillTries) so a model that never returns a usable style
+                // can't loop, and guarded by isGeneratingVoice (self-healed on drop) against double-firing.
+                if (!isGeneratingVoice && voiceBackfillTries < MaxVoiceBackfillTries)
                 {
                     var core = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
-                    if (core != null && !core.voiceGenerated && !string.IsNullOrEmpty(core.personalitySummary))
+                    if (core != null && string.IsNullOrWhiteSpace(core.voiceProfile))
                     {
-                        DeriveVoiceProfile(pawn, core);
+                        bool memberNeedsVoice = hasBackstoryMemory && VoiceProfileBuilder.NeedsVoiceBackfill(core);
+                        bool visitorNeedsVoice = !RimSynapse.Psychology.API.SynapsePsychology.IsEligibleForReview(pawn)
+                            && RimSynapse.Psychology.API.SynapsePsychology.IsEligibleForVoice(pawn);
+                        if (memberNeedsVoice || visitorNeedsVoice)
+                        {
+                            voiceBackfillTries++;
+                            DeriveVoiceProfile(pawn, core);
+                        }
                     }
                 }
 

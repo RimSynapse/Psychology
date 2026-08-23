@@ -98,19 +98,20 @@ namespace RimSynapse.Psychology.UI
             trajHeight += (traj.Count == 0 ? 22f : 0f) + 20f;
             totalFormHeight += trajHeight;
             
-            // Calculate Patient History height
-            var historyMemories = coreComp.memories.Where(m => m.tags != null && m.tags.Contains("TraitShift")).OrderBy(m => m.absTick).ToList();
+            // Calculate Patient History height — the full trait timeline: AI-engine gains/losses (#25)
+            // merged with therapy/desensitization changes, in one chronological list.
+            var timeline = RimSynapse.Psychology.Models.TraitTimeline.Build(coreComp, pawnComp);
             totalFormHeight += 22f + 10f; // Header
-            if (historyMemories.Count == 0)
+            if (timeline.Count == 0)
             {
                 totalFormHeight += Text.CalcHeight("No major psychological changes recorded.", rect.width - 30f) + 20f;
             }
             else
             {
-                foreach (var m in historyMemories)
+                foreach (var e in timeline)
                 {
-                    string dateStr = GenDate.DateFullStringAt(m.absTick, Find.WorldGrid.LongLatOf(pawn.Tile));
-                    string entry = $"[{dateStr}] {m.summary}";
+                    string dateStr = GenDate.DateFullStringAt(e.absTick, Find.WorldGrid.LongLatOf(pawn.Tile));
+                    string entry = $"[{dateStr}] {e.text}";
                     totalFormHeight += Text.CalcHeight(entry, rect.width - 30f) + 5f;
                 }
                 totalFormHeight += 20f;
@@ -250,7 +251,7 @@ namespace RimSynapse.Psychology.UI
             GUI.color = Color.white;
             formY += 22f;
             
-            if (historyMemories.Count == 0)
+            if (timeline.Count == 0)
             {
                 float textHeight = Text.CalcHeight("No major psychological changes recorded.", viewRect.width);
                 Rect valRect = new Rect(rect.x, formY, viewRect.width, textHeight);
@@ -259,10 +260,10 @@ namespace RimSynapse.Psychology.UI
             }
             else
             {
-                foreach (var m in historyMemories)
+                foreach (var e in timeline)
                 {
-                    string dateStr = GenDate.DateFullStringAt(m.absTick, Find.WorldGrid.LongLatOf(pawn.Tile));
-                    string entry = $"[{dateStr}] {m.summary}";
+                    string dateStr = GenDate.DateFullStringAt(e.absTick, Find.WorldGrid.LongLatOf(pawn.Tile));
+                    string entry = $"[{dateStr}] {e.text}";
                     float entryHeight = Text.CalcHeight(entry, viewRect.width);
                     Widgets.Label(new Rect(rect.x, formY, viewRect.width, entryHeight), entry);
                     formY += entryHeight + 5f;

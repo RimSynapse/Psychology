@@ -416,6 +416,33 @@ namespace RimSynapse.Psychology.Utils
             RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Reset trait-engine state for {p.LabelShort}.");
         }
 
+        /// <summary>#25: apply a dynamic trait then remove it and dump the lifecycle — proving the record
+        /// is CLOSED OUT (tickRemoved + removalReason) rather than deleted, so both the gain and the loss
+        /// survive with their reasoning for the Patient History timeline. Open the Psychology tab afterward
+        /// to see both entries rendered chronologically.</summary>
+        [DebugAction("RimSynapse", "Timeline: Dynamic-trait gain+loss round-trip (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void TraitTimelineRoundTrip(Pawn p)
+        {
+            if (p == null) return;
+            var comp = p.TryGetComp<SynapsePawnComp>();
+            if (comp == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no SynapsePawnComp."); return; }
+
+            const string td = "Synapse_Aversion_Intellectual"; // an engine trait a pawn won't normally carry
+            SynapsePsychology.ApplyTraitDirective(p, td, true, "debug: weeks in the fields soured them on the research bench");
+            SynapsePsychology.ApplyTraitDirective(p, td, false, "debug: a breakthrough rekindled their curiosity");
+
+            var recs = comp.dynamicTraits.Where(r => r.traitDef?.defName == td).ToList();
+            RimSynapse.SynapseLogger.Info("psychology", $"--- Trait timeline round-trip for {p.LabelShort}: {recs.Count} record(s) for {td} ---");
+            foreach (var r in recs)
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"  {r.traitDef.defName}: gained@{r.tickAdded} \"{r.reason}\""
+                    + (r.IsActive ? "  [ACTIVE]" : $"  |  lost@{r.tickRemoved} \"{r.removalReason}\""));
+            int active = comp.dynamicTraits.Count(r => r.IsActive);
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"  History preserved: record NOT deleted on removal; {active} active / {comp.dynamicTraits.Count} total. " +
+                "Open the Psychology tab → Patient History to see the gain and loss on the timeline.");
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpVoice(Pawn p)
         {
@@ -429,6 +456,59 @@ namespace RimSynapse.Psychology.Utils
             RimSynapse.SynapseLogger.Info("psychology", $"  style: {core.voiceProfile ?? "(none)"}");
         }
 
+        /// <summary>Voice coverage audit (Conversations#33): across every spawned humanlike, report how
+        /// many carry a populated voiceProfile — the prose speaking style Conversations consumes — split by
+        /// colony standing. The critical line is STRANDED: pawns that HAVE a personalitySummary but an empty
+        /// voiceProfile. That set should stay at (or drain to) zero, because the backfill now derives a voice
+        /// the moment a personalitySummary exists; a persistently non-zero count means the derive is failing
+        /// or being dropped. Plain [DebugAction] so it is headlessly triggerable via run_debug_action.</summary>
+        [DebugAction("RimSynapse", "Psychology: Dump voice coverage (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void DumpVoiceCoverage()
+        {
+            var map = Find.CurrentMap;
+            if (map == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse] No current map."); return; }
+
+            int total = 0, withVoice = 0, withPersonality = 0, stranded = 0;
+            int voiceEligible = 0, voiceEligibleWithVoice = 0, visitorEligible = 0, visitorWithVoice = 0;
+            var strandedNames = new System.Collections.Generic.List<string>();
+            RimSynapse.SynapseLogger.Info("psychology", "--- Voice coverage (spawned humanlikes) ---");
+            foreach (var p in map.mapPawns.AllPawnsSpawned.Where(x => x.RaceProps.Humanlike && !x.Dead)
+                         .OrderByDescending(x => SynapsePsychology.IsEligibleForVoice(x)))
+            {
+                var core = p.TryGetComp<SynapseCorePawnComp>();
+                if (core == null) continue;
+                total++;
+
+                bool hasVoice = !string.IsNullOrWhiteSpace(core.voiceProfile);
+                bool hasPersonality = !string.IsNullOrEmpty(core.personalitySummary);
+                bool member = SynapsePsychology.IsEligibleForReview(p);
+                bool voiceOk = SynapsePsychology.IsEligibleForVoice(p);
+                if (hasVoice) withVoice++;
+                if (hasPersonality) withPersonality++;
+                if (voiceOk) { voiceEligible++; if (hasVoice) voiceEligibleWithVoice++; }
+                if (voiceOk && !member) { visitorEligible++; if (hasVoice) visitorWithVoice++; }  // #41 visitor voices
+                // "Stranded" = a colony member who HAS a personality but no voice — the bug this fix targets.
+                bool isStranded = member && hasPersonality && !hasVoice;
+                if (isStranded) { stranded++; strandedNames.Add(p.LabelShort); }
+
+                string standing = p.IsSlaveOfColony ? "slave" : p.IsPrisonerOfColony ? "prisoner"
+                    : p.IsColonist ? "colonist" : p.IsQuestLodger() ? "guest(lodger)"
+                    : (p.HostileTo(Faction.OfPlayer) ? "hostile" : "visitor/other");
+                string tag = hasVoice ? "[voice]" : isStranded ? "[STRANDED]" : voiceOk ? "[pending]" : "[  -  ]";
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"  {tag} {p.LabelShort} — {standing} — voiceEligible:{(voiceOk ? "yes" : "no")} "
+                    + $"personality:{(hasPersonality ? "yes" : "no")} voiceGenerated:{core.voiceGenerated} "
+                    + $"kokoro:{core.kokoroVoice ?? "(none)"}");
+            }
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Voice coverage: {withVoice}/{total} have a voiceProfile; "
+                + $"voice-eligible {voiceEligibleWithVoice}/{voiceEligible} "
+                + $"(of which non-member visitors {visitorWithVoice}/{visitorEligible}); "
+                + $"{withPersonality} have a personalitySummary; "
+                + $"STRANDED members (personality but no voice): {stranded}"
+                + $"{(stranded > 0 ? " -> " + string.Join(", ", strandedNames) : "")} ---");
+        }
+
         [DebugAction("RimSynapse", "Psychology: (Re)generate voice (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void RegenerateVoice(Pawn p)
         {
@@ -437,7 +517,9 @@ namespace RimSynapse.Psychology.Utils
             var psych = p.TryGetComp<SynapsePawnComp>();
             if (core == null || psych == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.Name} missing comps for voice."); return; }
             core.voiceGenerated = false;      // allow re-derive
+            core.voiceProfile = null;         // clear the prose style so the backfill safety net re-fires if this drops
             core.kokoroVoice = null;          // reroll base voice too
+            psych.ResetVoiceBackfillBudget(); // fresh per-session retry budget for the reroll
             psych.DeriveVoiceProfile(p, core);
             RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] Requested voice (re)generation for {p.LabelShort}.");
         }

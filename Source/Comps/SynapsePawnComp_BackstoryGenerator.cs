@@ -26,6 +26,75 @@ namespace RimSynapse.Psychology.Comps
         private bool isGeneratingBackstory = false;
         private bool isGeneratingVoice = false;   // transient in-flight guard for voice backfill (#33)
 
+        // Self-healing for the async guards above. Core's RequestQueue SILENTLY discards a queued
+        // request — no callback — when the game isn't in the Playing state as the worker reaches it
+        // (map load) or when the session was cleared. Without a timeout, the in-flight guard would then
+        // wedge true for the rest of the session and generation would never retry (this is the "drop"
+        // that leaves voiceProfile/personalitySummary empty). We stamp the game tick when a guard is
+        // raised and clear it if it stays up longer than a live LLM call could ever take. Not persisted:
+        // a reload starts every pawn fresh, which is the desired retry behaviour.
+        private int backstoryGuardTick = -1;
+        private int voiceGuardTick = -1;
+        // ~4 in-game hours. Comfortably longer than any real request even at 4x speed with a backed-up
+        // queue (so a genuinely slow-but-live request is never mistaken for a drop), yet short enough that
+        // a truly dropped request retries the same day. A false clear is harmless anyway: the re-derive is
+        // idempotent and bounded by MaxVoiceBackfillTries.
+        private const int AsyncGuardTimeoutTicks = 15000;
+
+        // Per-session cap on re-deriving a missing voiceProfile, mirroring personalityBackfillTries.
+        // Not persisted, so a reload grants a fresh budget. Bounds the cost if a model never returns a
+        // usable Voice block, while still trying enough times to ride out transient drops/parse failures.
+        private int voiceBackfillTries = 0;
+        private const int MaxVoiceBackfillTries = 5;
+
+        /// <summary>Raise the backstory-generation guard and stamp it for the self-heal timeout.</summary>
+        private void BeginBackstoryGen()
+        {
+            isGeneratingBackstory = true;
+            backstoryGuardTick = Find.TickManager?.TicksGame ?? -1;
+        }
+
+        /// <summary>Reset the per-session voice retry budget and in-flight guard so voice derivation can
+        /// start over — used by the "(Re)generate voice" debug action and any deliberate reroll.</summary>
+        public void ResetVoiceBackfillBudget()
+        {
+            voiceBackfillTries = 0;
+            isGeneratingVoice = false;
+            voiceGuardTick = -1;
+        }
+
+        /// <summary>Raise the voice-generation guard and stamp it for the self-heal timeout.</summary>
+        private void BeginVoiceGen()
+        {
+            isGeneratingVoice = true;
+            voiceGuardTick = Find.TickManager?.TicksGame ?? -1;
+        }
+
+        /// <summary>
+        /// Clear an async guard that has been raised longer than any real request could take — the
+        /// request was almost certainly dropped by the queue (game not Playing / session cleared) and
+        /// its callback will never fire. Called each pawn tick so generation can retry instead of
+        /// wedging. Called on the same 250-tick cadence as the generation checks below.
+        /// </summary>
+        private void SelfHealAsyncGuards(Pawn pawn)
+        {
+            int now = Find.TickManager?.TicksGame ?? 0;
+            if (isGeneratingBackstory && backstoryGuardTick >= 0 && now - backstoryGuardTick > AsyncGuardTimeoutTicks)
+            {
+                isGeneratingBackstory = false;
+                backstoryGuardTick = -1;
+                RimSynapse.SynapseLogger.Warn("psychology",
+                    $"[RimSynapse-Psychology] Backstory-generation request for {pawn.Name.ToStringShort} never returned (likely dropped during load/session change) — clearing guard so it can retry.");
+            }
+            if (isGeneratingVoice && voiceGuardTick >= 0 && now - voiceGuardTick > AsyncGuardTimeoutTicks)
+            {
+                isGeneratingVoice = false;
+                voiceGuardTick = -1;
+                RimSynapse.SynapseLogger.Warn("psychology",
+                    $"[RimSynapse-Psychology] Voice-derive request for {pawn.Name.ToStringShort} never returned (likely dropped) — clearing guard so it can retry.");
+            }
+        }
+
         /// <summary>
         /// Entry point — called from CompTickRare when the pawn doesn't have a backstory yet.
         /// Kicks off Step 1 (childhood memory generation).
@@ -35,7 +104,7 @@ namespace RimSynapse.Psychology.Comps
             var coreComp = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
             if (coreComp == null) return;
 
-            isGeneratingBackstory = true;
+            BeginBackstoryGen();
 
             bool hasChildhood = coreComp.memories.Any(m => m.memoryType == "BackstoryChildhood");
             bool hasAdulthood = coreComp.memories.Any(m => m.memoryType == "BackstoryAdulthood");
@@ -72,14 +141,20 @@ namespace RimSynapse.Psychology.Comps
             if (pawn == null) return;
             hasBackstoryMemory = false;
             isGeneratingBackstory = false;
+            isGeneratingVoice = false;
+            backstoryGuardTick = -1;
+            voiceGuardTick = -1;
+            voiceBackfillTries = 0;
             ticksToGenerateBackstory = 0;
             var coreComp = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
             if (coreComp != null)
             {
                 // Clear the pieces the pipeline branches on so every step (childhood → adulthood →
-                // personality → voice) re-runs rather than short-circuiting on stale data.
+                // personality → voice) re-runs rather than short-circuiting on stale data. voiceProfile
+                // is cleared too so the voice backfill (which now keys on an empty voiceProfile) re-derives.
                 coreComp.memories?.RemoveAll(m => m.memoryType == "BackstoryChildhood" || m.memoryType == "BackstoryAdulthood");
                 coreComp.personalitySummary = null;
+                coreComp.voiceProfile = null;
                 coreComp.voiceGenerated = false;
             }
             GenerateAIBackstory(pawn);
