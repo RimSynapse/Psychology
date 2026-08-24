@@ -247,8 +247,9 @@ OUTPUT FORMAT:
    - Core Archetype (e.g., Caregiver, Outlaw, Creator, Sage, Ruler, Hero, Explorer, Jester)
    - Temperament (e.g., Sanguine, Melancholic, Phlegmatic, Choleric)
 3. [FIRST_IMPRESSION] — A detailed 2-3 sentence narrative memory of how this pawn came to be at the colony. Written in the third person perspective (using their name or ""he/she"", never ""I"" or ""my""). Ground it in the 'Current situation' below — a colonist's hopeful landing, a prisoner being brought in bound, a slave's subjugation, or a guest's visit read very differently. Connect their background and disposition to that concrete circumstance; do NOT assume a hopeful arrival unless the situation says so.
-4. [VOICE] — How this pawn SPEAKS, so their dialogue sounds distinct from everyone else. Provide:
-   - style: how they talk — sentence length, diction, humour, verbal tics, what they avoid saying
+4. [VOICE] — How this pawn SPEAKS out loud, so their dialogue sounds distinct from everyone else. Provide:
+   - style: how they talk, in plain words a neighbor would use (""short and blunt"", ""rambles when nervous"", ""teases everyone"") — under 15 words. NEVER analyst's language: no 'discourse', 'abstract', 'concepts', 'emotional appeals', 'processes', 'efficiency'. These are frontier folk; reserve a bookish or technical way of speaking for a pawn whose background truly is one, and even then it is how a PERSON talks, not how a paper reads.
+   - sample: one line they might actually say out loud on an ordinary day, in THEIR voice, under 15 words — the single strongest signal of how they sound.
    - pace: one of slow | measured | fast
    - timbre: one of warm | gruff | bright | flat | breathy | clipped
 
@@ -258,7 +259,7 @@ You MUST respond in valid JSON:
   ""JungianType"": ""INTJ"",
   ""CoreArchetype"": ""Explorer"",
   ""Temperament"": ""Melancholic"",
-  ""Voice"": { ""style"": ""Terse and dry; clipped sentences; deflects feelings with sarcasm; rarely finishes a sad thought."", ""pace"": ""measured"", ""timbre"": ""flat"" },
+  ""Voice"": { ""style"": ""short and blunt; dry jokes; changes the subject when things get sad"", ""sample"": ""Roof's patched. Next time tell me before it rains."", ""pace"": ""measured"", ""timbre"": ""flat"" },
   ""FirstImpression"": ""Fred stepped out of cryosleep after decades in the void. Though this harsh desert outpost was far from the lush forest worlds of his childhood dreams, he was resolved to make it his home and build something lasting.""
 }";
 
@@ -309,9 +310,9 @@ Synthesize their psychological profile.";
 
                             // Voice (#33): prose speaking style (Conversations) + Kokoro assignment (TTS 0.10+).
                             if (parsed.TryGetValue("Voice", out object voiceObj)
-                                && VoiceProfileBuilder.TryReadVoice(voiceObj, out string vStyle, out string vPace, out string vTimbre))
+                                && VoiceProfileBuilder.TryReadVoice(voiceObj, out string vStyle, out string vPace, out string vTimbre, out string vSample))
                             {
-                                VoiceProfileBuilder.ApplyVoiceProfile(pawn, coreComp, vStyle, vPace, vTimbre);
+                                VoiceProfileBuilder.ApplyVoiceProfile(pawn, coreComp, vStyle, vPace, vTimbre, vSample);
                             }
                             else
                             {
@@ -393,7 +394,8 @@ Synthesize their psychological profile.";
                     {
                         var jo = Newtonsoft.Json.Linq.JObject.Parse(json);
                         VoiceProfileBuilder.ApplyVoiceProfile(pawn, coreComp,
-                            jo.Value<string>("style"), jo.Value<string>("pace"), jo.Value<string>("timbre"));
+                            jo.Value<string>("style"), jo.Value<string>("pace"), jo.Value<string>("timbre"),
+                            jo.Value<string>("sample"));
                         RimSynapse.SynapseLogger.Info("psychology",
                             $"[RimSynapse-Psychology] Voice derived for {pawn.Name.ToStringShort}: {coreComp.kokoroVoice}, speed {coreComp.kokoroSpeed:F2}.");
                     }

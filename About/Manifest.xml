@@ -6,7 +6,7 @@
   Interoperable with the community "Version Checker" mod.
 -->
 <Manifest>
-  <version>0.9.1</version>
+  <version>0.9.2</version>
   <coreVersion>0.9.1</coreVersion>
   <manifestUri>https://raw.githubusercontent.com/RimSynapse/Psychology/main/About/Manifest.xml</manifestUri>
   <downloadUri>https://github.com/RimSynapse/Psychology/releases/latest</downloadUri>

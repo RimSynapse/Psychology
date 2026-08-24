@@ -1,0 +1,6 @@
+# RimSynapse Psychology — shipped assembly manifest
+# version: 0.9.2
+# commit:  425152e (working tree had other uncommitted changes)
+# format:  sha256sum — verify with 'verify-binaries.ps1' or 'sha256sum -c'
+e1e27af7b07eeedf5ce71a9255f0422816a6fc5849a483c6714e1b472044fa9d  Newtonsoft.Json.dll
+9be21b43c9a2141b314a59e235d3b1e9eb8e9127df2b6d4ce8a871a380584c86  RimSynapsePsychology.dll
