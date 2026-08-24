@@ -53,6 +53,18 @@ namespace RimSynapse.Psychology.API
                             {
                                 ApplyTraitJudgment(pawn, pawnComp, judgmentArr);
                             }
+                            else if (kvp.Key == "Voice" && kvp.Value is Newtonsoft.Json.Linq.JObject voiceObj)
+                            {
+                                // Daily voice tracking: the review re-derives the pawn's speaking voice from
+                                // today's psychological picture (continuity-guarded in the prompt), so trait
+                                // shifts, breaks and mood arcs surface in how they talk.
+                                var voiceCore = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
+                                if (voiceCore != null
+                                    && Comps.VoiceProfileBuilder.TryReadVoice(voiceObj, out string vStyle, out string vPace, out string vTimbre, out string vSample))
+                                {
+                                    Comps.VoiceProfileBuilder.ApplyVoiceProfile(pawn, voiceCore, vStyle, vPace, vTimbre, vSample);
+                                }
+                            }
                             else if (kvp.Key == "PersonalityShiftAssessment" || kvp.Key == "TraitChanges")
                             {
                                 // Legacy schemas — the measured engine drives changes now; ignore, keep for record.

@@ -1,5 +1,5 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
-[b]Version:[/b] v0.9.2 (Target: RimWorld 1.6)
+[b]Version:[/b] v0.9.3 (Target: RimWorld 1.6)
 
 [h1]RimSynapse - Psychology[/h1]
 [b][url=https://github.com/RimSynapse/Psychology/wiki]Official Wiki and Documentation[/url][/b]
@@ -19,6 +19,12 @@ RimSynapse Psychology replaces vanilla's rigid opinion number with a fluid Trust
 These ship when they are ready - no dates.
 
 ---
+
+[h2]Changelog (v0.9.3) - Voices that grow with the pawn[/h2]
+[list]
+[*] NEW - Daily voice tracking: each pawn's speaking voice is now refreshed as part of the nightly psychological review, so a forming trait, a mental break, or a mood that hardens over days gradually surfaces in how they talk. Voices stay recognizable day to day - they only shift when the pawn genuinely shifts. No extra AI calls: the voice rides the review the colony already runs.
+[*] Requires RimSynapse Core v0.9.1.
+[/list]
 
 [h2]Changelog (v0.9.2) - Voices that sound like people[/h2]
 [list]

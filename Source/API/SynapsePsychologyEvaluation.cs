@@ -156,6 +156,10 @@ You must also provide an 'AbandonmentRiskScore' (0-100) representing how likely 
 
 Finally, output a 'SocialAdjustments' object reflecting changes in their Trust (-100 to +100) and Familiarity (0 to 100) with other colonists based on recent events. Use the colonist's short name as the key. Trust offsets should be between -15 and +15. Familiarity offsets should be positive (0 to +10).
 
+Also output a 'Voice' object — how this colonist SPEAKS out loud as of today, so their spoken dialogue tracks who they are becoming.
+{VOICE_RULES}
+Voice continuity: this is the SAME PERSON as yesterday — their current voice is given in the patient data as 'Current Voice'. Keep the voice recognizable, and adjust it ONLY as their psychology genuinely shifts: a forming or fading trait, a mental break, a mood that has hardened or brightened over days. If nothing meaningful changed, return their current voice essentially unchanged.
+
 The engine already measures which personality changes are building for this colonist from their ACTUAL behaviour and how they cope — you do NOT invent changes or set numbers. Your job is to JUDGE whether each building change rings true for who they are, and to NARRATE it. Here is the current picture:
 {TRAIT_CANDIDATES}
 Return:
@@ -183,7 +187,8 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
       ""trustOffset"": 2.5,
       ""familiarityOffset"": 1.0
     }
-  }
+  },
+  ""Voice"": { ""style"": ""short and blunt; dry jokes; changes the subject when things get sad"", ""sample"": ""Roof's patched. Next time tell me before it rains."", ""pace"": ""measured"", ""timbre"": ""flat"" }
 }";
 
             string dlcInstructions = "";
@@ -294,6 +299,9 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
             systemPrompt = systemPrompt.Replace("{TRAIT_PRESSURES}", DescribeTraitPressures(coreComp));
             // Phase 2: the judge/narrate candidate picture (ids the model must copy back).
             systemPrompt = systemPrompt.Replace("{TRAIT_CANDIDATES}", DescribeTraitCandidatesForPrompt(pawn, coreComp));
+            // Voice tracks the psyche: the review re-derives it daily under the same register rules as the
+            // one-shot derive (shared constant, so the two prompts cannot drift).
+            systemPrompt = systemPrompt.Replace("{VOICE_RULES}", Prompts.VoiceProfilePromptComposer.StyleAndSampleRules);
 
             // #26: named injection point — let other mods add context to the nightly clinical review.
             string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.DailyReview);
@@ -306,6 +314,7 @@ Time as Colonist: {timeAsColonist:F1} days
 Survival Stats: Melee {melee}, Shooting {shooting}, Medicine {medicine}, Damage Taken: {damageTaken:F0}
 {lifetimeViolence}
 Average Mood Today: {averageMood:F2}{suppression}
+Current Voice: {(string.IsNullOrEmpty(coreComp.voiceProfile) ? "not yet established" : coreComp.voiceProfile)}
 Long-standing psychological burdens (weighted): {lifetimeBurdens}
 Current Social Network (Trust, Familiarity, Affinity):
 {socialNetworkStr}
