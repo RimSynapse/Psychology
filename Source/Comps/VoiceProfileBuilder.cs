@@ -27,11 +27,20 @@ namespace RimSynapse.Psychology.Comps
                && !string.IsNullOrEmpty(core.personalitySummary);
 
         /// <summary>Assign/refresh a pawn's voice fields from parsed Voice descriptors. Idempotent;
-        /// always leaves a valid base <c>kokoroVoice</c> and sets <c>voiceGenerated</c>.</summary>
-        public static void ApplyVoiceProfile(Pawn pawn, SynapseCorePawnComp core, string style, string pace, string timbre)
+        /// always leaves a valid base <c>kokoroVoice</c> and sets <c>voiceGenerated</c>.
+        /// The optional <paramref name="sample"/> — one line the pawn might actually say — is appended to
+        /// <c>voiceProfile</c>: the dialogue model imitates an example far more reliably than it interprets
+        /// a description, so the sample is the strongest register anchor Conversations gets (#44).</summary>
+        public static void ApplyVoiceProfile(Pawn pawn, SynapseCorePawnComp core, string style, string pace, string timbre, string sample = null)
         {
             if (core == null) return;
-            if (!string.IsNullOrWhiteSpace(style)) core.voiceProfile = style.Trim();
+            if (!string.IsNullOrWhiteSpace(style))
+            {
+                string profile = style.Trim().TrimEnd('.');
+                if (!string.IsNullOrWhiteSpace(sample))
+                    profile = $"{profile}. Might say: «{sample.Trim().Trim('"')}»";
+                core.voiceProfile = profile;
+            }
 
             if (string.IsNullOrEmpty(core.kokoroVoice) || !KokoroVoices.IsKnown(core.kokoroVoice))
                 core.kokoroVoice = KokoroVoices.RandomVoiceFor(pawn);
@@ -81,15 +90,17 @@ namespace RimSynapse.Psychology.Comps
             if (core.kokoroBlendVoice == core.kokoroVoice) { core.kokoroBlendVoice = null; core.kokoroBlendWeight = 0f; }
         }
 
-        /// <summary>Extract style/pace/timbre from a parsed "Voice" JSON value (JObject).</summary>
-        public static bool TryReadVoice(object voiceObj, out string style, out string pace, out string timbre)
+        /// <summary>Extract style/sample/pace/timbre from a parsed "Voice" JSON value (JObject).
+        /// <c>sample</c> is absent from profiles generated before 0.9.2 — callers pass it through as null.</summary>
+        public static bool TryReadVoice(object voiceObj, out string style, out string pace, out string timbre, out string sample)
         {
-            style = pace = timbre = null;
+            style = pace = timbre = sample = null;
             if (voiceObj is JObject jo)
             {
                 style = jo.Value<string>("style");
                 pace = jo.Value<string>("pace");
                 timbre = jo.Value<string>("timbre");
+                sample = jo.Value<string>("sample");
                 return true;
             }
             return false;

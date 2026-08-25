@@ -38,46 +38,18 @@ namespace RimSynapse.Psychology.Comps
             // Allow Core/Factions to inject extra context (like Ideology)
             string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.BackstoryChildhood);
 
-            string systemPrompt = @"You are writing a vivid third-person memory for a colonist in the RimWorld universe, as if the AI Storyteller is describing their childhood.
-This memory is from their CHILDHOOD. It should be a specific, concrete scene — not a summary.
-
-RULES:
-- Write 100-200 words, third person (using their name or ""he/she"", never ""I"" or ""my"")
-- This is a SINGLE vivid memory, not a life summary
-- Ground the memory in the skill bonuses: if they got +4 Mining, describe WHY through experience (e.g., ""Josema spent years chipping limestone..."")
-- If work types are disabled, hint at WHY (trauma, cultural taboo, physical limitation)
-- The memory should feel personal and emotionally resonant — a moment they'd actually remember
-- RimWorld setting: frontier planets, crashlanded survivors, tribal societies, harsh conditions
-- You MUST also generate a ""Hometown"" — their place of origin. This should match their background:
-  - Outlander/Settler → a named settlement or outpost (e.g., ""Kharstead"", ""Port Valen"")
-  - Tribal → a geographic feature, camp, or caravan route (e.g., ""the Redstone caravan"", ""the marshlands east of Sleeping Ridge"")
-  - Pirate → a ship, station, or raider den (e.g., ""the Rust Fang"", ""Scrapheap Station"")
-  - Imperial → a named city or estate (e.g., ""the Stellarch's court at Novium"")
-  - If their backstory implies they moved a lot or are orphaned, something vague is fine (""the roads between nowhere"")
-
-You MUST respond in valid JSON:
-{
-  ""Memory"": ""Josema remembered the first time he...(100-200 words)..."",
-  ""Hometown"": ""Kharstead"",
-  ""Tags"": [""Origin"", ""Childhood"", ""Mining""],
-  ""EmotionalTone"": ""bittersweet""
-}";
-
-            string userMessage = $@"{ColonyRoleLabel(pawn)}: {pawn.Name.ToStringShort}
-Gender: {pawn.gender}
-Faction Background: {factionType}
-Childhood Backstory: ""{childhoodTitle}""
-Vanilla Description: ""{childhoodDesc}""
-Skill Bonuses from Childhood: {skillBonuses}
-{(string.IsNullOrEmpty(disabledWork) ? "" : $"Disabled Work Types: {disabledWork}\n")}{factionContext}{crossModContext}
-Write a vivid childhood memory grounded in these skills.";
+            // Prompt authored once in the pure composer so the game-free Prompt Lab builds the exact same
+            // system+user pair without launching RimWorld.
+            var prompt = RimSynapse.Psychology.Prompts.ChildhoodMemoryPromptComposer.Compose(
+                ColonyRoleLabel(pawn), pawn.Name.ToStringShort, pawn.gender.ToString(), factionType,
+                childhoodTitle, childhoodDesc, skillBonuses, disabledWork, factionContext + crossModContext);
 
             var options = new ChatOptions { priority = 1, requestName = "Childhood Backstory", targetName = pawn.Name.ToStringShort };
 
             SynapseClient.PromptAsync(
                 RimSynapsePsychologyMod.ModHandle,
-                systemPrompt,
-                userMessage,
+                prompt.system,
+                prompt.user,
                 result => OnChildhoodMemoryGenerated(result, pawn, coreComp),
                 options
             );
@@ -275,8 +247,9 @@ OUTPUT FORMAT:
    - Core Archetype (e.g., Caregiver, Outlaw, Creator, Sage, Ruler, Hero, Explorer, Jester)
    - Temperament (e.g., Sanguine, Melancholic, Phlegmatic, Choleric)
 3. [FIRST_IMPRESSION] — A detailed 2-3 sentence narrative memory of how this pawn came to be at the colony. Written in the third person perspective (using their name or ""he/she"", never ""I"" or ""my""). Ground it in the 'Current situation' below — a colonist's hopeful landing, a prisoner being brought in bound, a slave's subjugation, or a guest's visit read very differently. Connect their background and disposition to that concrete circumstance; do NOT assume a hopeful arrival unless the situation says so.
-4. [VOICE] — How this pawn SPEAKS, so their dialogue sounds distinct from everyone else. Provide:
-   - style: how they talk — sentence length, diction, humour, verbal tics, what they avoid saying
+4. [VOICE] — How this pawn SPEAKS out loud, so their dialogue sounds distinct from everyone else. Provide:
+   - style: how they talk, in plain words a neighbor would use (""short and blunt"", ""rambles when nervous"", ""teases everyone"") — under 15 words. NEVER analyst's language: no 'discourse', 'abstract', 'concepts', 'emotional appeals', 'processes', 'efficiency'. These are frontier folk; reserve a bookish or technical way of speaking for a pawn whose background truly is one, and even then it is how a PERSON talks, not how a paper reads.
+   - sample: one line they might actually say out loud on an ordinary day, in THEIR voice, under 15 words — the single strongest signal of how they sound.
    - pace: one of slow | measured | fast
    - timbre: one of warm | gruff | bright | flat | breathy | clipped
 
@@ -286,7 +259,7 @@ You MUST respond in valid JSON:
   ""JungianType"": ""INTJ"",
   ""CoreArchetype"": ""Explorer"",
   ""Temperament"": ""Melancholic"",
-  ""Voice"": { ""style"": ""Terse and dry; clipped sentences; deflects feelings with sarcasm; rarely finishes a sad thought."", ""pace"": ""measured"", ""timbre"": ""flat"" },
+  ""Voice"": { ""style"": ""short and blunt; dry jokes; changes the subject when things get sad"", ""sample"": ""Roof's patched. Next time tell me before it rains."", ""pace"": ""measured"", ""timbre"": ""flat"" },
   ""FirstImpression"": ""Fred stepped out of cryosleep after decades in the void. Though this harsh desert outpost was far from the lush forest worlds of his childhood dreams, he was resolved to make it his home and build something lasting.""
 }";
 
@@ -337,9 +310,9 @@ Synthesize their psychological profile.";
 
                             // Voice (#33): prose speaking style (Conversations) + Kokoro assignment (TTS 0.10+).
                             if (parsed.TryGetValue("Voice", out object voiceObj)
-                                && VoiceProfileBuilder.TryReadVoice(voiceObj, out string vStyle, out string vPace, out string vTimbre))
+                                && VoiceProfileBuilder.TryReadVoice(voiceObj, out string vStyle, out string vPace, out string vTimbre, out string vSample))
                             {
-                                VoiceProfileBuilder.ApplyVoiceProfile(pawn, coreComp, vStyle, vPace, vTimbre);
+                                VoiceProfileBuilder.ApplyVoiceProfile(pawn, coreComp, vStyle, vPace, vTimbre, vSample);
                             }
                             else
                             {
@@ -407,20 +380,17 @@ Synthesize their psychological profile.";
                 if (string.IsNullOrWhiteSpace(personality)) personality = "an ordinary traveller of the rim";
             }
 
-            string systemPrompt = @"From a person's traits and background, define how they SPEAK so their dialogue sounds distinct. Respond in valid JSON:
-{ ""style"": ""how they talk: sentence length, diction, humour, verbal tics, what they avoid saying"",
-  ""pace"": ""slow|measured|fast"",
-  ""timbre"": ""warm|gruff|bright|flat|breathy|clipped"" }";
-            string userMessage = $@"Person: {pawn.Name.ToStringShort}
-Traits: {traits}
-Psychology: {psych}
-Background: {personality}";
+            // Prompt authored once in the pure composer so the game-free Prompt Lab builds the exact same
+            // system+user pair without launching RimWorld. The visitor fallback above is applied first so the
+            // composer always receives a non-empty personality line (#41).
+            var prompt = RimSynapse.Psychology.Prompts.VoiceProfilePromptComposer.Compose(
+                pawn.Name.ToStringShort, traits, psych, personality);
 
             var options = new ChatOptions { priority = 5, requestName = "Voice Profile", targetName = pawn.Name.ToStringShort };
             SynapseClient.PromptAsync(
                 RimSynapsePsychologyMod.ModHandle,
-                systemPrompt,
-                userMessage,
+                prompt.system,
+                prompt.user,
                 result => OnVoiceProfileDerived(result, pawn, coreComp),
                 options
             );
@@ -437,7 +407,8 @@ Background: {personality}";
                     {
                         var jo = Newtonsoft.Json.Linq.JObject.Parse(json);
                         VoiceProfileBuilder.ApplyVoiceProfile(pawn, coreComp,
-                            jo.Value<string>("style"), jo.Value<string>("pace"), jo.Value<string>("timbre"));
+                            jo.Value<string>("style"), jo.Value<string>("pace"), jo.Value<string>("timbre"),
+                            jo.Value<string>("sample"));
                         RimSynapse.SynapseLogger.Info("psychology",
                             $"[RimSynapse-Psychology] Voice derived for {pawn.Name.ToStringShort}: {coreComp.kokoroVoice}, speed {coreComp.kokoroSpeed:F2}.");
                     }
