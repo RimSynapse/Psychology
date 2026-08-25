@@ -78,7 +78,9 @@ namespace RimSynapse.Psychology.Tests
                     core.voiceProfile = null; core.voiceGenerated = false;
 
                     VoiceProfileBuilder.ApplyVoiceProfile(p, core, "Terse and dry.", "fast", "gruff");
-                    Assert.Equal("Terse and dry.", core.voiceProfile, "style stored");
+                    // ApplyVoiceProfile trims a trailing period off the raw style so appending
+                    // ". Might say: «sample»" can't double it — so the stored style has no period.
+                    Assert.Equal("Terse and dry", core.voiceProfile, "style stored (trailing period trimmed)");
                     Assert.True(global::RimSynapse.KokoroVoices.IsKnown(core.kokoroVoice), "base voice is a known id");
                     Assert.True(Math.Abs(core.kokoroSpeed - 1.15f) < 0.001f, "fast -> 1.15 speed");
                     Assert.True(core.kokoroBlendWeight > 0f && global::RimSynapse.KokoroVoices.IsKnown(core.kokoroBlendVoice)
@@ -88,7 +90,7 @@ namespace RimSynapse.Psychology.Tests
                     VoiceProfileBuilder.ApplyVoiceProfile(p, core, null, "slow", "flat");
                     Assert.True(Math.Abs(core.kokoroSpeed - 0.9f) < 0.001f, "slow -> 0.9 speed");
                     Assert.True(core.kokoroBlendWeight == 0f && string.IsNullOrEmpty(core.kokoroBlendVoice), "flat -> no blend");
-                    Assert.Equal("Terse and dry.", core.voiceProfile, "null style preserves prior style");
+                    Assert.Equal("Terse and dry", core.voiceProfile, "null style preserves prior style");
                     return $"speed/blend mapping ok; base={core.kokoroVoice}";
                 }
                 finally
