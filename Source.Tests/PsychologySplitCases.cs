@@ -36,7 +36,12 @@ namespace RimSynapse.Psychology.Tests
                 Assert.True(reg.RequiredCoreContract <= SynapseCompatRegistry.CoreApiContract,
                     $"Psychology (needs API {reg.RequiredCoreContract}) is compatible with Core (API {SynapseCompatRegistry.CoreApiContract})");
                 Assert.True(PsychologyCompat.IsCoreCompatible, "Psychology probed Core and found itself compatible");
-                return $"psychology needs API {reg.RequiredCoreContract}, core API {SynapseCompatRegistry.CoreApiContract}, compatible";
+                // The registry must report Psychology's TRUE version (#62): the const drifted behind the
+                // manifest through 0.9.2/0.9.3, so Psychology told Core the wrong build number. verify-metadata.ps1
+                // guards the const vs the manifest; this guards that the const is what actually reaches the registry.
+                Assert.Equal(PsychologyCompat.PsychologyVersion, reg.Version,
+                    "the registry reports the version const Psychology declares");
+                return $"psychology v{reg.Version} needs API {reg.RequiredCoreContract}, core API {SynapseCompatRegistry.CoreApiContract}, compatible";
             });
 
             // Under -quicktest the LLM is mocked and the ceremony prompt matches none of the
