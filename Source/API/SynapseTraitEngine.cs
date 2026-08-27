@@ -41,7 +41,11 @@ namespace RimSynapse.Psychology.API
 
             float reinforcement = core.UpdateMoodBaselineAndGetReinforcement(todayMood);
             float stress = ComputeStress(pawn, todayMood);
-            var signals = SynapseSkillAxisMap.SampleSignals(pawn, core, reinforcement, stress);
+            // Fortune trend (#54): is this pawn's personal wealth rising? Sampled once per rest edge into its
+            // own EMA baseline, mirroring mood — it is the other half of "killing that pays off".
+            float wealthReinforcement = core.UpdateWealthBaselineAndGetReinforcement(
+                SynapseCorePawnComp.ComputeIndividualWealth(pawn));
+            var signals = SynapseSkillAxisMap.SampleSignals(pawn, core, reinforcement, stress, wealthReinforcement);
             float mult = Settings?.traitDriftMultiplier ?? 1f; // master "how fast personalities drift" knob
             foreach (var sig in signals)
             {

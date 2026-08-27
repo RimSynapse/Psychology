@@ -263,6 +263,11 @@ namespace RimSynapse.Psychology.Utils
             var core = p.TryGetComp<SynapseCorePawnComp>();
             if (core == null) return;
             core.moodBaseline = 0.5f;
+            core.wealthBaseline = -1f; // reseed the fortune trend so the rising loot below reads as rising
+
+            // #54: Bloodlust is PROFITABLE, DOMINANT killing. Make this pawn the colony's runaway top killer
+            // (peers have ~0 kills), or the dominance factor is 0 and no Bloodlust can form no matter the mood.
+            p.records?.AddTo(RecordDefOf.KillsHumanlikes, 12);
 
             for (int day = 1; day <= 12; day++)
             {
@@ -270,6 +275,14 @@ namespace RimSynapse.Psychology.Utils
                 core.recentJobs.Clear();
                 core.recentJobs.Add(new JobInterval("AttackMelee", now - 50000, 50000, "humanlike"));
                 core.lastJobStartedTick = -1; // no ongoing job to dilute the fraction
+                // Personal fortune RISING as they kill: drop a fat stack of silver into their pack each day, so
+                // ComputeIndividualWealth climbs and the fortune trend reads positive — killing that PAYS OFF.
+                if (p.inventory != null)
+                {
+                    var silver = ThingMaker.MakeThing(ThingDefOf.Silver);
+                    silver.stackCount = 1000;
+                    p.inventory.innerContainer.TryAdd(silver);
+                }
                 // Mood ABOVE baseline: they feel good after the killing -> positive reinforcement -> Bloodlust.
                 RimSynapse.Psychology.API.SynapseTraitEngine.ProcessRestEdge(p, core, 0.72f);
             }
@@ -441,6 +454,38 @@ namespace RimSynapse.Psychology.Utils
             RimSynapse.SynapseLogger.Info("psychology",
                 $"  History preserved: record NOT deleted on removal; {active} active / {comp.dynamicTraits.Count} total. " +
                 "Open the Psychology tab → Patient History to see the gain and loss on the timeline.");
+        }
+
+        /// <summary>#54: dump the Bloodlust reinforcement signal for the clicked pawn — kill dominance, current
+        /// living-violence exposure, and the Bloodlust dailyPressure the curve yields for a THRIVING dominant
+        /// killer vs a pawn merely SURVIVING a scramble. Proves the "profitable dominant killing, not survival
+        /// killing" gate: the thriving case pushes Bloodlust; the survival case must push none.</summary>
+        [DebugAction("RimSynapse", "Bloodlust: signal dump (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void BloodlustSignalDump(Pawn p)
+        {
+            if (p == null) return;
+            var core = p.TryGetComp<SynapseCorePawnComp>();
+            if (core == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no SynapseCorePawnComp."); return; }
+
+            core.GetActivityMetrics(out float idle, out float livingViolence);
+            float dominance = SynapseCorePawnComp.KillDominance(p);
+            int mine = p.records?.GetAsInt(RecordDefOf.KillsHumanlikes) ?? 0;
+            float mineWealth = SynapseCorePawnComp.ComputeIndividualWealth(p);
+            float avgWealth = p.Map != null ? SynapseCorePawnComp.ColonyAverageIndividualWealth(p.Map) : 0f;
+
+            // The curve is pure, so evaluate both narratives directly with representative inputs. Exposure uses
+            // the pawn's ACTUAL living-violence fraction so a peaceful pawn correctly reads 0 on both.
+            float thriving = SynapseSkillAxisMap.BloodlustPressure(livingViolence, posR: 1f, dominance: dominance, wealthUp: 1f);
+            float survival = SynapseSkillAxisMap.BloodlustPressure(livingViolence, posR: 0f, dominance: dominance, wealthUp: 0f);
+            // What a proven dominant, thriving killer WOULD score if in combat today (exposure forced past the floor).
+            float ifFighting = SynapseSkillAxisMap.BloodlustPressure(0.5f, posR: 1f, dominance: dominance, wealthUp: 1f);
+
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Bloodlust signal for {p.LabelShort} ---\n" +
+                $"  humanlike kills: {mine}   kill-dominance: {dominance:F2}   (colony wealth: mine {mineWealth:F0} vs avg {avgWealth:F0})\n" +
+                $"  today: idle {idle:P0}, living-violence {livingViolence:P0} (floor {SynapseSkillAxisMap.BloodlustViolenceFloor:P0})\n" +
+                $"  Bloodlust pressure — thriving+dominant: {thriving:F3}   surviving(no fortune): {survival:F3}   [if fighting @50%: {ifFighting:F3}]\n" +
+                $"  GATE: survival case must be 0.000 — {(survival == 0f ? "PASS" : "FAIL")}; a non-killer (dominance 0) never pushes Bloodlust.");
         }
 
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
