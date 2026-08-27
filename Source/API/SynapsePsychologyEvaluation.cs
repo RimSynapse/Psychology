@@ -43,6 +43,16 @@ namespace RimSynapse.Psychology.API
             return $"Lifetime violence against the living: {humanlikeKills} humanlike, {animalKills} animal ({living} living kills total)";
         }
 
+        /// <summary>Human-readable trend of a live value vs its rolling EMA baseline, for the #54 fortune lines.
+        /// A baseline &lt; 0 is the "not yet established" sentinel both the mood and wealth baselines use.</summary>
+        public static string TrendVs(float current, float baseline)
+        {
+            if (baseline < 0f) return "not yet tracked";
+            if (current > baseline * 1.05f) return "RISING";
+            if (current < baseline * 0.95f) return "falling";
+            return "steady";
+        }
+
         /// <summary>Human-readable accumulated trait trajectory for the eval prompt (Stage 2).</summary>
         public static string DescribeTraitPressures(RimSynapse.Comps.SynapseCorePawnComp coreComp)
         {
@@ -183,6 +193,7 @@ Return:
 - 'PersonalityShiftLikelihood': ""none"" | ""low"" | ""moderate"" | ""high"" — your read of whether ANY of these changes is genuinely warranted right now.
 - 'TraitJudgment': an array, one entry per candidate above you have a view on. Each: { ""candidateId"": <copy an id EXACTLY from the list>, ""verdict"": ""in_character"" | ""out_of_character"" | ""uncertain"", ""flavor"": <one vivid, in-character sentence describing this change as if it just happened> }. The flavor is the EXACT text the overseer reads when the change lands, so ALWAYS write one for any candidate at 60% or more. Judge ""in_character"" vs ""out_of_character"" against their SETTLED CHARACTER above, not your mood today. Use ""out_of_character"" ONLY when the change would betray who this colonist truly is despite the behaviour — that pushes back against it. CONSISTENCY: where a candidate shows ""your prior read"", keep that same verdict unless the situation has genuinely changed — do NOT flip a verdict from one night to the next without a real reason. Empty array only if nothing is building.
 IMPORTANT — violence vs. the living: traits that reflect a taste for killing or cruelty (e.g. 'Bloodlust') require evidence of harming LIVING creatures (humanlikes or animals). Destroying inanimate objects, mining, or repeatedly attacking wrecked machinery is NOT violence against the living and must NEVER, on its own, justify adding 'Bloodlust' or removing protective/steadfast traits. If today's activity was primarily against objects, set dailyPressure near 0 and likelihood ""none""/""low"".
+IMPORTANT — Bloodlust is REINFORCED, DOMINANT killing, not survival killing: it develops when a colonist keeps killing AND thrives from it — their personal fortune and mood RISING as they kill — and ESPECIALLY when they out-kill the other colonists (the colony's dedicated killer, not one of many hands). Killing while suffering in a high-conflict scramble where everyone is fighting to survive is TRAUMA, not bloodlust — there, keep likelihood ""none""/""low"" and expect the engine to push mood down, not Bloodlust up. Judge a building 'Bloodlust' candidate ""in_character"" only when the picture is a thriving, dominant killer.
 IMPORTANT — trait resistance: respect the resistance values below. Protected traits must NOT be removed without overwhelming, sustained evidence.
 The colonist currently has these AI-added traits (added by you previously): {DYNAMIC_TRAITS}. Their current traits with resistance: {TRAIT_RESISTANCE}. Accumulated trait pressure so far (trajectory across days): {TRAIT_PRESSURES}.
 
@@ -326,6 +337,17 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
             // #26: named injection point — let other mods add context to the nightly clinical review.
             string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.DailyReview);
 
+            // #54: the two signals that separate REINFORCED, DOMINANT killing from desperate survival killing,
+            // stated plainly so the model judges a building Bloodlust against the same picture the engine
+            // measures it from — out-killing peers, AND a personal fortune (wealth + mood) that is rising.
+            float killDominance = RimSynapse.Comps.SynapseCorePawnComp.KillDominance(pawn);
+            string killStanding = lifetimeKills <= 0 ? "has never killed a person"
+                : killDominance >= 0.6f ? $"the colony's DOMINANT killer — out-kills the others (dominance {killDominance:F2})"
+                : killDominance >= 0.3f ? $"a notable killer among peers (dominance {killDominance:F2})"
+                : $"one of many hands; a minor share of the colony's kills (dominance {killDominance:F2})";
+            string wealthTrend = TrendVs(RimSynapse.Comps.SynapseCorePawnComp.ComputeIndividualWealth(pawn), coreComp.wealthBaseline);
+            string moodTrend = TrendVs(averageMood, coreComp.moodBaseline);
+
             string userMessage = $@"Patient Name: {pawn.Name.ToStringShort}
 Gender: {pawn.gender}
 Status: {statusText}
@@ -333,6 +355,8 @@ Colony Size: {colonySize}
 Time as Colonist: {timeAsColonist:F1} days
 Survival Stats: Melee {melee}, Shooting {shooting}, Medicine {medicine}, Damage Taken: {damageTaken:F0}
 {lifetimeViolence}
+Kill standing vs the colony: {killStanding}
+Personal fortune trend: wealth {wealthTrend}, mood {moodTrend} (Bloodlust needs BOTH — out-killing peers AND fortune rising; survival killing while suffering is trauma, not bloodlust)
 Average Mood Today: {averageMood:F2}{suppression}
 Current Voice: {(string.IsNullOrEmpty(coreComp.voiceProfile) ? "not yet established" : coreComp.voiceProfile)}
 Long-standing psychological burdens (weighted): {lifetimeBurdens}
