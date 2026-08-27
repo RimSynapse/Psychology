@@ -32,6 +32,9 @@ namespace RimSynapse.Psychology.Patches
                 // Active Growth: Familiarity goes up on any interaction
                 initRec.AddFamiliarity(2f);
                 recRec.AddFamiliarity(2f);
+
+                // #23: notify the player once when this pair first crosses a named familiarity milestone.
+                RimSynapse.Psychology.API.SynapseFamiliarityMilestones.CheckAndNotify(initiator, recipient, initRec, recRec);
                 
                 // Trust changes based on interaction type
                 var slightDef = DefDatabase<InteractionDef>.GetNamed("Slight", false);
