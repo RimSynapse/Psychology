@@ -488,6 +488,45 @@ namespace RimSynapse.Psychology.Utils
                 $"  GATE: survival case must be 0.000 — {(survival == 0f ? "PASS" : "FAIL")}; a non-killer (dominance 0) never pushes Bloodlust.");
         }
 
+        /// <summary>#23: push the clicked pawn's familiarity with the nearest other colonist past the first named
+        /// milestone and notify — proving ONE letter fires, the pair marker advances, and a second check is a
+        /// no-op (never re-fires). Watch the letter stack for a single "Close Friends" letter naming both.</summary>
+        [DebugAction("RimSynapse", "Familiarity: cross a milestone with nearest colonist (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void FamiliarityMilestoneCross(Pawn p)
+        {
+            if (p == null) return;
+            var comp = p.TryGetComp<SynapsePawnComp>();
+            var other = p.Map?.mapPawns?.FreeColonists?.FirstOrDefault(c => c != p);
+            if (comp == null || other == null)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort}: need a SynapsePawnComp and a second free colonist.");
+                return;
+            }
+            var otherComp = other.TryGetComp<SynapsePawnComp>();
+            string oId = other.GetUniqueLoadID(), pId = p.GetUniqueLoadID();
+            if (!comp.socialNetwork.ContainsKey(oId)) comp.socialNetwork[oId] = new RimSynapse.Psychology.Models.SocialRecord();
+            if (!otherComp.socialNetwork.ContainsKey(pId)) otherComp.socialNetwork[pId] = new RimSynapse.Psychology.Models.SocialRecord();
+            var recA = comp.socialNetwork[oId];
+            var recB = otherComp.socialNetwork[pId];
+
+            float firstThreshold = SynapseFamiliarityMilestones.Milestones[0].threshold;
+            recA.familiarity = recB.familiarity = firstThreshold + 1f;
+            int before = recA.highestFamiliarityMilestone;
+
+            SynapseFamiliarityMilestones.CheckAndNotify(p, other, recA, recB); // should fire ONE letter + advance both
+            int afterFirst = recA.highestFamiliarityMilestone;
+            SynapseFamiliarityMilestones.CheckAndNotify(p, other, recA, recB); // should be a no-op (no second letter)
+            int afterSecond = recA.highestFamiliarityMilestone;
+
+            string label = afterFirst >= 0 ? SynapseFamiliarityMilestones.Milestones[afterFirst].label : "(none)";
+            bool markersEqual = recA.highestFamiliarityMilestone == recB.highestFamiliarityMilestone;
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Familiarity milestone for {p.LabelShort} ↔ {other.LabelShort} ---\n" +
+                $"  familiarity {recA.familiarity:F0} crossed to '{label}' (marker {before} -> {afterFirst}); both records marked: {markersEqual}\n" +
+                $"  second check re-fired? {(afterSecond != afterFirst ? "YES (BUG)" : "no — no duplicate letter")}. " +
+                "Check the letter stack for exactly ONE 'Close Friends' letter naming both colonists.");
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpVoice(Pawn p)
         {
