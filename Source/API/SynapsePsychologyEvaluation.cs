@@ -43,6 +43,16 @@ namespace RimSynapse.Psychology.API
             return $"Lifetime violence against the living: {humanlikeKills} humanlike, {animalKills} animal ({living} living kills total)";
         }
 
+        /// <summary>Human-readable trend of a live value vs its rolling EMA baseline, for the #54 fortune lines.
+        /// A baseline &lt; 0 is the "not yet established" sentinel both the mood and wealth baselines use.</summary>
+        public static string TrendVs(float current, float baseline)
+        {
+            if (baseline < 0f) return "not yet tracked";
+            if (current > baseline * 1.05f) return "RISING";
+            if (current < baseline * 0.95f) return "falling";
+            return "steady";
+        }
+
         /// <summary>Human-readable accumulated trait trajectory for the eval prompt (Stage 2).</summary>
         public static string DescribeTraitPressures(RimSynapse.Comps.SynapseCorePawnComp coreComp)
         {
@@ -327,6 +337,17 @@ You MUST respond strictly in valid JSON format. Do not include markdown formatti
             // #26: named injection point — let other mods add context to the nightly clinical review.
             string crossModContext = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.DailyReview);
 
+            // #54: the two signals that separate REINFORCED, DOMINANT killing from desperate survival killing,
+            // stated plainly so the model judges a building Bloodlust against the same picture the engine
+            // measures it from — out-killing peers, AND a personal fortune (wealth + mood) that is rising.
+            float killDominance = RimSynapse.Comps.SynapseCorePawnComp.KillDominance(pawn);
+            string killStanding = lifetimeKills <= 0 ? "has never killed a person"
+                : killDominance >= 0.6f ? $"the colony's DOMINANT killer — out-kills the others (dominance {killDominance:F2})"
+                : killDominance >= 0.3f ? $"a notable killer among peers (dominance {killDominance:F2})"
+                : $"one of many hands; a minor share of the colony's kills (dominance {killDominance:F2})";
+            string wealthTrend = TrendVs(RimSynapse.Comps.SynapseCorePawnComp.ComputeIndividualWealth(pawn), coreComp.wealthBaseline);
+            string moodTrend = TrendVs(averageMood, coreComp.moodBaseline);
+
             string userMessage = $@"Patient Name: {pawn.Name.ToStringShort}
 Gender: {pawn.gender}
 Status: {statusText}
@@ -334,6 +355,8 @@ Colony Size: {colonySize}
 Time as Colonist: {timeAsColonist:F1} days
 Survival Stats: Melee {melee}, Shooting {shooting}, Medicine {medicine}, Damage Taken: {damageTaken:F0}
 {lifetimeViolence}
+Kill standing vs the colony: {killStanding}
+Personal fortune trend: wealth {wealthTrend}, mood {moodTrend} (Bloodlust needs BOTH — out-killing peers AND fortune rising; survival killing while suffering is trauma, not bloodlust)
 Average Mood Today: {averageMood:F2}{suppression}
 Current Voice: {(string.IsNullOrEmpty(coreComp.voiceProfile) ? "not yet established" : coreComp.voiceProfile)}
 Long-standing psychological burdens (weighted): {lifetimeBurdens}

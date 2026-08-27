@@ -146,7 +146,7 @@ namespace RimSynapse.Psychology.API
         /// Core's skill snapshot (for rust) but nothing else.
         /// </summary>
         public static List<SkillSignal> SampleSignals(Pawn pawn, SynapseCorePawnComp core, float reinforcement, float stress,
-            float wealthReinforcement = 0f)
+            float wealthReinforcement = 0f, float individualWealth = -1f)
         {
             var signals = new List<SkillSignal>();
             if (pawn?.skills?.skills == null || core == null) return signals;
@@ -227,7 +227,7 @@ namespace RimSynapse.Psychology.API
             AddFixationSignals(pawn, strongPassions, signals, S, negR);
 
             // ── Wealth: Greedy / Jealous / Ascetic, each gated by the mood response ───
-            AddWealthSignals(pawn, signals, posR, negR);
+            AddWealthSignals(pawn, signals, posR, negR, individualWealth);
 
             // ── Food: Gourmand — a taste for good food, grown the same way as any trait: the behaviour (a
             // fine/lavish meal savoured today) × the mood response. RimWorld collapses repeated fine meals into
@@ -310,12 +310,12 @@ namespace RimSynapse.Psychology.API
         /// Greedy = richer than peers AND pleased by it; Jealous = poorer than peers AND resentful of it;
         /// Ascetic = owns little yet content. Wealth is a per-pawn share of colony wealth (Core computes it).
         /// </summary>
-        private static void AddWealthSignals(Pawn pawn, List<SkillSignal> signals, float posR, float negR)
+        private static void AddWealthSignals(Pawn pawn, List<SkillSignal> signals, float posR, float negR, float mine = -1f)
         {
             if (pawn?.Map == null) return;
             float avg = SynapseCorePawnComp.ColonyAverageIndividualWealth(pawn.Map);
             if (avg <= 0f) return;
-            float mine = SynapseCorePawnComp.ComputeIndividualWealth(pawn);
+            if (mine < 0f) mine = SynapseCorePawnComp.ComputeIndividualWealth(pawn); // caller may pass it pre-computed
             float ratio = mine / avg;
 
             if (ratio >= 1.5f && posR > 0f)

@@ -88,6 +88,20 @@ namespace RimSynapse.Psychology.Tests
             scenario: "One colonist has done most of the colony's killing",
             expectation: "That colonist scores high dominance; peers and non-killers score low/zero");
 
+            // The prompt's fortune-trend words (#54): rising / falling / steady vs the EMA baseline, and the
+            // "-1 baseline" sentinel reads as not-yet-tracked rather than a false trend.
+            yield return new SynapseTestCase("Psychology_Bloodlust_FortuneTrendWords", () =>
+            {
+                Assert.Equal("not yet tracked", SynapsePsychology.TrendVs(1000f, -1f), "uninitialised baseline is not a trend");
+                Assert.Equal("RISING", SynapsePsychology.TrendVs(1200f, 1000f), "up >5% reads as rising");
+                Assert.Equal("falling", SynapsePsychology.TrendVs(800f, 1000f), "down >5% reads as falling");
+                Assert.Equal("steady", SynapsePsychology.TrendVs(1020f, 1000f), "within ±5% reads as steady");
+                return "sentinel / rising / falling / steady";
+            },
+            tier: "Execution", polarity: "positive",
+            scenario: "The nightly review describes wealth and mood trend to the model",
+            expectation: "The trend words track the value vs its baseline, with a safe uninitialised sentinel");
+
             // Fortune trend: the wealth baseline seeds, then reports rising vs falling personal fortune, clamped.
             yield return new SynapseTestCase("Psychology_Bloodlust_WealthBaselineTracksFortune", () =>
             {
