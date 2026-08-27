@@ -49,6 +49,7 @@ namespace RimSynapse.Psychology.API
         public const string Greedy = "Greedy";
         public const string Jealous = "Jealous";
         public const string Ascetic = "Ascetic";
+        public const string Gourmand = "Gourmand";
 
         /// <summary>Maps a skill to its work type, the graduated DISTASTE spectrum a pawn moves along as they
         /// come to resent that work (reluctant -> averse, a skill penalty), and the rare terminal INCAPABLE
@@ -227,6 +228,14 @@ namespace RimSynapse.Psychology.API
 
             // ── Wealth: Greedy / Jealous / Ascetic, each gated by the mood response ───
             AddWealthSignals(pawn, signals, posR, negR);
+
+            // ── Food: Gourmand — a taste for good food, grown the same way as any trait: the behaviour (a
+            // fine/lavish meal savoured today) × the mood response. RimWorld collapses repeated fine meals into
+            // one refreshing thought, so "repeatedly" is captured ACROSS days: the signal fires each day the
+            // thought is present and decays when it lapses, so only sustained indulgence accumulates. Hunger
+            // food (paste/raw) is excluded by MealIndulgenceToday, so this is indulgence, not mere eating. ──
+            if (SynapseCorePawnComp.MealIndulgenceToday(pawn) >= 1 && posR > 0f)
+                AddSingle(pawn, signals, Gourmand, add: true, 0.20f * posR, "savoured fine food, and wanted more");
 
             return signals;
         }
