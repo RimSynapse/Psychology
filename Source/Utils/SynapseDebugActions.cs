@@ -527,6 +527,42 @@ namespace RimSynapse.Psychology.Utils
                 "Check the letter stack for exactly ONE 'Close Friends' letter naming both colonists.");
         }
 
+        /// <summary>#72: prove tending grants trust ONCE PER SESSION, not per wound. Injures the clicked pawn with
+        /// several wounds, has the nearest other colonist tend once (TendUtility.DoTend), and confirms trust rose
+        /// by a single session's worth — not multiplied by the wound count.</summary>
+        [DebugAction("RimSynapse", "Relationships: tend builds trust per session (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void TendTrustPerSession(Pawn p)
+        {
+            if (p == null) return;
+            var doctor = p.Map?.mapPawns?.FreeColonists?.FirstOrDefault(c => c != p);
+            if (doctor == null || p.GetComp<SynapsePawnComp>() == null || doctor.GetComp<SynapsePawnComp>() == null)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort}: need a second free colonist and comps on both.");
+                return;
+            }
+
+            // Inflict several fresh wounds so a single tend pass has multiple hediffs to treat.
+            int wounds = 4;
+            for (int i = 0; i < wounds; i++)
+                p.TakeDamage(new DamageInfo(DamageDefOf.Cut, 4f, instigator: doctor));
+
+            string dId = doctor.GetUniqueLoadID();
+            var pComp = p.GetComp<SynapsePawnComp>();
+            pComp.socialNetwork.TryGetValue(dId, out var recBefore);
+            float trustBefore = recBefore?.trust ?? 0f;
+            int tendable = p.health?.hediffSet?.hediffs?.Count(h => h.TendableNow()) ?? 0;
+
+            RimWorld.TendUtility.DoTend(doctor, p, null); // one session — tends all optimal hediffs in one pass
+
+            pComp.socialNetwork.TryGetValue(dId, out var recAfter);
+            float trustAfter = recAfter?.trust ?? 0f;
+            float delta = trustAfter - trustBefore;
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Tend trust: {doctor.LabelShort} tended {p.LabelShort} ---\n" +
+                $"  {wounds} wound(s) inflicted, {tendable} tendable in this pass; trust {trustBefore:F0} -> {trustAfter:F0} (Δ {delta:F0})\n" +
+                $"  PER SESSION: Δ should equal ONE session's award (3), NOT {wounds}× it — {(System.Math.Abs(delta - 3f) < 0.01f ? "PASS" : "CHECK")}.");
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpVoice(Pawn p)
         {
