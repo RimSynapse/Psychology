@@ -231,6 +231,51 @@ namespace RimSynapse.Psychology.Tests
                 tier: "Execution", polarity: "positive",
                 scenario: "A parsed review is applied to a colonist",
                 expectation: "Control is written; deltas apply directed and bounded; an unearned rivalry becomes friction");
+
+            // The nightly review gathers + builds its prompt without throwing, and fires at most once a day.
+            yield return new SynapseTestCase("Psychology_RelReview_QueuesOncePerDay",
+                QueuesOncePerDay,
+                skipReason: () =>
+                {
+                    var map = Find.CurrentMap ?? Find.Maps?.FirstOrDefault();
+                    var cs = map?.mapPawns?.FreeColonists;
+                    return (cs != null && cs.Count >= 2) ? null : "need two colonists";
+                },
+                tier: "Execution", polarity: "positive",
+                scenario: "A colonist with a significant relationship has their nightly review fired",
+                expectation: "It builds and queues once; a second call the same day is a no-op");
+        }
+
+        private static string QueuesOncePerDay()
+        {
+            var map = Find.CurrentMap ?? Find.Maps.FirstOrDefault();
+            var colonists = map.mapPawns.FreeColonists.ToList();
+            var a = colonists[0];
+            var b = colonists[1];
+            var compA = a.GetComp<SynapsePawnComp>();
+            string idB = b.GetUniqueLoadID();
+            compA.socialNetwork.TryGetValue(idB, out var prior);
+            int day0 = compA.lastRelationshipReviewDay;
+            try
+            {
+                // Ensure a significant relationship exists so the review has something to reconsider.
+                var rec = prior ?? new SocialRecord();
+                if (prior == null) compA.socialNetwork[idB] = rec;
+                rec.familiarity = System.Math.Max(rec.familiarity, 40f);
+                compA.lastRelationshipReviewDay = -1;
+
+                bool first = RimSynapse.Psychology.API.SynapsePsychology.QueueRelationshipReview(a);
+                Assert.True(first, "the review builds and queues for a pawn with a significant relationship");
+                Assert.Equal(RimWorld.GenDate.DaysPassed, compA.lastRelationshipReviewDay, "the review is marked done for today");
+                bool second = RimSynapse.Psychology.API.SynapsePsychology.QueueRelationshipReview(a);
+                Assert.False(second, "a second call the same day is a no-op (once/day)");
+                return "queued once; second same-day call skipped";
+            }
+            finally
+            {
+                compA.lastRelationshipReviewDay = day0;
+                if (prior == null) compA.socialNetwork.Remove(idB);
+            }
         }
 
         private static string ApplyBoundedDirectedAndGated()

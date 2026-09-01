@@ -288,8 +288,11 @@ You MUST respond strictly in valid JSON:
                 if (success)
                 {
                     pawnComp.lastJournalUpdateDay = currentDay;
+                    // #72: the finished personality read feeds the nightly relationship review — the pawn now
+                    // reconsiders how they feel about the people they live with.
+                    QueueRelationshipReview(targetPawn);
                 }
-                else 
+                else
                 {
                     // If it failed, flag them again so it retries later
                     pawnComp.isAwaitingJournalUpdate = true;
