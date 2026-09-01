@@ -694,6 +694,31 @@ namespace RimSynapse.Psychology.Utils
                 $"  → certainty erosion/day: {erosion:F3}  ({eta} to convert). Both the gate AND a fond tie are needed.");
         }
 
+        /// <summary>#72: dump the clicked PRISONER's recruitment softening — their warmth toward the colonists,
+        /// whether they share the colony faith (the recruit multiplier), the per-day resistance shaved, and how
+        /// long until they'd join. Closes the befriend→convert→recruit loop.</summary>
+        [DebugAction("RimSynapse", "Relationships: recruitment softening dump (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void RecruitmentSofteningDump(Pawn p)
+        {
+            if (p == null) return;
+            var comp = p.GetComp<SynapsePawnComp>();
+            if (comp == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no SynapsePawnComp."); return; }
+            if (!p.IsPrisonerOfColony || p.guest == null)
+            { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} is not a colony prisoner — no resistance to soften."); return; }
+
+            float warmth01 = SynapseRecruitment.WarmthTowardColonists(p, comp);
+            var colonyIdeo = ModsConfig.IdeologyActive ? Faction.OfPlayerSilentFail?.ideos?.PrimaryIdeo : null;
+            bool sharesFaith = colonyIdeo != null && p.Ideo == colonyIdeo;
+            float reduction = SynapseRecruitment.ResistanceReduction(warmth01, sharesFaith);
+            float resistance = p.guest.resistance;
+            string eta = reduction > 0f ? $"~{(int)System.Math.Ceiling(resistance / reduction)} days" : "never (no bond yet)";
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Recruitment softening for {p.LabelShort} ---\n" +
+                $"  resistance: {resistance:F1}   warmth toward colonists: {warmth01:F2}   " +
+                $"shares colony faith: {sharesFaith} ({(sharesFaith ? $"{SynapseRecruitment.ConvertRecruitMultiplier:F0}x" : "1x")})\n" +
+                $"  → resistance shaved/day: {reduction:F2}  ({eta} to willingly join). A bond is required; converting recruits far faster.");
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpVoice(Pawn p)
         {

@@ -259,6 +259,21 @@ namespace RimSynapse.Psychology.Tests
             tier: "Execution", polarity: "positive",
             scenario: "The LLM sets a susceptibility gate; C# drives certainty each day",
             expectation: "Faith drifts only when the pawn is both open AND fond of the colony's faithful");
+
+            // Recruitment driver (closes the loop): resistance softens with the bond, faster once they share faith.
+            yield return new SynapseTestCase("Psychology_Recruitment_ResistanceSoftensWithBondAndFaith", () =>
+            {
+                float b = SynapseRecruitment.BaseResistancePerDay;
+                float m = SynapseRecruitment.ConvertRecruitMultiplier;
+                Assert.True(System.Math.Abs(SynapseRecruitment.ResistanceReduction(1f, false) - b) < 0.0001f, "full warmth, different faith = base reduction");
+                Assert.True(System.Math.Abs(SynapseRecruitment.ResistanceReduction(1f, true) - b * m) < 0.0001f, "a convert loses resistance the multiplier faster");
+                Assert.Equal(0f, SynapseRecruitment.ResistanceReduction(0f, true), "a prisoner nobody has bonded with doesn't soften on their own");
+                Assert.True(SynapseRecruitment.ResistanceReduction(1f, true) > SynapseRecruitment.ResistanceReduction(1f, false), "sharing the colony faith recruits faster");
+                return $"resistance/day = base({b:F2}) x warmth x (convert ? {m:F0}x : 1)";
+            },
+            tier: "Execution", polarity: "positive",
+            scenario: "A well-liked prisoner, before vs after converting to the colony's faith",
+            expectation: "Resistance softens with warmth, and much faster once they share the faith");
         }
 
         private static string QueuesOncePerDay()

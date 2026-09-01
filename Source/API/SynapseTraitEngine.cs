@@ -67,6 +67,10 @@ namespace RimSynapse.Psychology.API
             // #72: faith drifts toward the people you love — erode certainty per the LLM susceptibility gate ×
             // the compass (Ideology-only; no-op otherwise). When it bottoms out, vanilla converts them.
             SynapseConversion.DriveDaily(pawn, psychComp);
+
+            // #72: a prisoner who's grown fond of the colonists softens toward joining (much faster once they
+            // share the colony's faith) — closing the befriend->convert->recruit loop. No-op for non-prisoners.
+            SynapseRecruitment.DriveDaily(pawn, psychComp);
         }
 
         private static int HardenAfterBreaks => Settings?.hardenAfterBreaks ?? 3; // repeated breaks before permanent
