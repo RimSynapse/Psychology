@@ -57,6 +57,11 @@ namespace RimSynapse.Psychology.API
             }
 
             ResolveEscalation(pawn, core);
+
+            // #72: drift relationships toward what personalities currently imply — recomputed live so trait
+            // shifts move it, and modulated by familiarity/valence (desensitise a valued bond, hypersensitise a
+            // resented one). Runs on the same daily cadence as the trait pass.
+            SynapseCompatibility.ApplyDailyDrift(pawn, pawn.TryGetComp<RimSynapse.Psychology.Comps.SynapsePawnComp>());
         }
 
         private static int HardenAfterBreaks => Settings?.hardenAfterBreaks ?? 3; // repeated breaks before permanent
