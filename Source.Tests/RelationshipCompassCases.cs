@@ -244,6 +244,21 @@ namespace RimSynapse.Psychology.Tests
                 tier: "Execution", polarity: "positive",
                 scenario: "A colonist with a significant relationship has their nightly review fired",
                 expectation: "It builds and queues once; a second call the same day is a no-op");
+
+            // Conversion driver (the C# hour-to-hour half): faith only erodes with BOTH the LLM gate open AND fond
+            // ties to the colony's faith. Either at zero → no drift, so nobody converts by accident.
+            yield return new SynapseTestCase("Psychology_Conversion_CertaintyErosionNeedsGateAndBond", () =>
+            {
+                float b = SynapseConversion.BaseErosionPerDay;
+                Assert.True(System.Math.Abs(SynapseConversion.CertaintyErosion(1f, 1f) - b) < 0.0001f, "full warmth + full openness = a full day's erosion");
+                Assert.Equal(0f, SynapseConversion.CertaintyErosion(1f, 0f), "an unshakeable pawn (susceptibility 0) never drifts, however many friends they make");
+                Assert.Equal(0f, SynapseConversion.CertaintyErosion(0f, 1f), "an open pawn with no fond ties to the faith doesn't drift");
+                Assert.True(System.Math.Abs(SynapseConversion.CertaintyErosion(0.5f, 0.5f) - b * 0.25f) < 0.0001f, "erosion is warmth × susceptibility");
+                return $"erosion = base({b:F2}) × warmth × susceptibility; both gates required";
+            },
+            tier: "Execution", polarity: "positive",
+            scenario: "The LLM sets a susceptibility gate; C# drives certainty each day",
+            expectation: "Faith drifts only when the pawn is both open AND fond of the colony's faithful");
         }
 
         private static string QueuesOncePerDay()

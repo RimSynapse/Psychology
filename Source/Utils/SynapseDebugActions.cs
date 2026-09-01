@@ -670,6 +670,30 @@ namespace RimSynapse.Psychology.Utils
                     : $"[RimSynapse] {p.LabelShort} has no significant relationships to reconsider yet.");
         }
 
+        /// <summary>#72: dump the clicked pawn's faith-conversion drift — their LLM susceptibility gate, their
+        /// warmth toward the colony's faithful, the per-day certainty erosion that produces, and roughly how long
+        /// until they'd convert. Ideology-only.</summary>
+        [DebugAction("RimSynapse", "Relationships: conversion drift dump (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ConversionDriftDump(Pawn p)
+        {
+            if (p == null) return;
+            if (!ModsConfig.IdeologyActive) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse] Ideology is not active — conversion drift is inert."); return; }
+            var comp = p.GetComp<SynapsePawnComp>();
+            if (comp == null || p.ideo == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no comp/ideo."); return; }
+
+            var colonyIdeo = Faction.OfPlayerSilentFail?.ideos?.PrimaryIdeo;
+            float warmth01 = colonyIdeo != null ? SynapseConversion.WarmthTowardColonyFaith(p, comp, colonyIdeo) : 0f;
+            float erosion = SynapseConversion.CertaintyErosion(warmth01, comp.conversionSusceptibility);
+            float certainty = p.ideo.Certainty;
+            bool sameFaith = colonyIdeo != null && p.Ideo == colonyIdeo;
+            string eta = erosion > 0f ? $"~{(int)System.Math.Ceiling(certainty / erosion)} days" : "never (no drift)";
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Conversion drift for {p.LabelShort} ---\n" +
+                $"  their faith: {p.Ideo?.name ?? "none"}   colony faith: {colonyIdeo?.name ?? "none"}   {(sameFaith ? "(already the colony faith — inert)" : "")}\n" +
+                $"  susceptibility (LLM gate): {comp.conversionSusceptibility:F2}   warmth toward the faithful: {warmth01:F2}   current certainty: {certainty:F2}\n" +
+                $"  → certainty erosion/day: {erosion:F3}  ({eta} to convert). Both the gate AND a fond tie are needed.");
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpVoice(Pawn p)
         {

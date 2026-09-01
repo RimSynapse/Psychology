@@ -21,6 +21,7 @@ namespace RimSynapse.Psychology.API
     public class RelationshipReviewResult
     {
         public float? compulsionControl;                        // the LLM's refined read of this pawn's emotional brake
+        public float? conversionSusceptibility;                 // how open they are to the colony's faith (0..1), Ideology-only
         public List<RelationshipDelta> relationships = new List<RelationshipDelta>();
     }
 
@@ -62,6 +63,9 @@ namespace RimSynapse.Psychology.API
             // The LLM refines this pawn's emotional brake (the C# triggers only ever READ it).
             if (result.compulsionControl.HasValue)
                 comp.compulsionControl = Clamp01(result.compulsionControl.Value);
+            // And how open they are to the colony's faith — the gate the C# certainty driver reads.
+            if (result.conversionSusceptibility.HasValue)
+                comp.conversionSusceptibility = Clamp01(result.conversionSusceptibility.Value);
 
             if (result.relationships == null) return applied;
             foreach (var d in result.relationships)

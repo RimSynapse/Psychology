@@ -56,6 +56,12 @@ namespace RimSynapse.Psychology.API
             var byName = new Dictionary<string, Pawn>();
             foreach (var (other, _) in picks) byName[other.Name.ToStringShort] = other;
 
+            bool ideoActive = ModsConfig.IdeologyActive && pawn.Ideo != null;
+            string ideoRule = ideoActive
+                ? "\n- Rate 'conversionSusceptibility' 0..1: how open YOU are to leaving your faith for the colony's — high ONLY if your certainty is genuinely wavering AND you have come to love people of that faith; 0 if you would never abandon your gods."
+                : "";
+            string ideoField = ideoActive ? "\"conversionSusceptibility\": 0.1, " : "";
+
             string systemPrompt =
 $@"You are {pawn.Name.ToStringShort}'s honest inner read on the people they live with. You have just reflected on yourself; now weigh how you truly feel about each person listed.
 
@@ -66,10 +72,10 @@ Rules:
 - Change is slow: keep each nightly nudge small. warmthDelta and trustDelta must be within -12..12.
 - 'kind' is one of: bonding, friction, jealousy, rivalry, betrayal, reconciliation.
   RESERVE 'rivalry' and 'betrayal' for genuinely serious, EARNED turns — betrayal is a real breach by someone you trusted; rivalry is deep, sustained mutual antagonism between people who know each other well. NEVER use them over something small.
-- Also rate your own emotional control: 'compulsionControl' 0..1, where 0 = you act on every feeling and 1 = you keep it all inside. Base it on your temperament.
+- Also rate your own emotional control: 'compulsionControl' 0..1, where 0 = you act on every feeling and 1 = you keep it all inside. Base it on your temperament.{ideoRule}
 
 Respond ONLY as valid JSON, no markdown:
-{{ ""compulsionControl"": 0.5, ""relationships"": [ {{ ""who"": ""<name>"", ""warmthDelta"": 0, ""trustDelta"": 0, ""reason"": ""<one sentence>"", ""kind"": ""<kind>"" }} ] }}";
+{{ ""compulsionControl"": 0.5, {ideoField}""relationships"": [ {{ ""who"": ""<name>"", ""warmthDelta"": 0, ""trustDelta"": 0, ""reason"": ""<one sentence>"", ""kind"": ""<kind>"" }} ] }}";
 
             string me = !string.IsNullOrWhiteSpace(core.personalitySummary)
                 ? core.personalitySummary
