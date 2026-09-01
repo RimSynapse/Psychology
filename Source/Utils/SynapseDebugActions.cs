@@ -627,6 +627,33 @@ namespace RimSynapse.Psychology.Utils
             finally { ally.drafter.Drafted = wasDrafted; }
         }
 
+        /// <summary>#72: dump the clicked pawn's personality compatibility with every other colonist — the raw
+        /// score with its clash/kinship reasons, and the warmth pull it would drift this pass (showing how
+        /// familiarity desensitises a liked clash or hypersensitises a resented one).</summary>
+        [DebugAction("RimSynapse", "Relationships: compatibility dump (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void CompatibilityDump(Pawn p)
+        {
+            if (p?.Map == null) return;
+            var comp = p.GetComp<SynapsePawnComp>();
+            var sb = new System.Text.StringBuilder($"--- Compatibility for {p.LabelShort} ---\n");
+            foreach (var other in p.Map.mapPawns.FreeColonists)
+            {
+                if (other == p) continue;
+                var reasons = new System.Collections.Generic.List<string>();
+                float compat = SynapseCompatibility.Score(p, other, reasons);
+                float warmth = 0f, familiarity = 0f;
+                if (comp != null && comp.socialNetwork.TryGetValue(other.GetUniqueLoadID(), out var rec) && rec != null)
+                { warmth = rec.warmth; familiarity = rec.familiarity; }
+                float pull = SynapseCompatibility.EffectivePull(compat, familiarity, warmth);
+                sb.Append($"  {other.LabelShort}: compat {compat:+0.00;-0.00} [{(reasons.Count > 0 ? string.Join(", ", reasons) : "neutral")}]");
+                sb.Append($"  | warmth {warmth:F0}, fam {familiarity:F0} → daily pull {pull:+0.00;-0.00}");
+                if (compat < 0f && familiarity >= 40f)
+                    sb.Append(warmth >= 0f ? "  (desensitised — they overlook it)" : "  (hypersensitised — it grates)");
+                sb.Append("\n");
+            }
+            RimSynapse.SynapseLogger.Info("psychology", sb.ToString());
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpVoice(Pawn p)
         {

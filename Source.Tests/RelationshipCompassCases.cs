@@ -138,6 +138,53 @@ namespace RimSynapse.Psychology.Tests
                 tier: "Execution", polarity: "positive",
                 scenario: "A colonist fells a threat while a colleague fights nearby",
                 expectation: "The nearby drafted colleague gains trust with the killer; null/empty inputs are safe");
+
+            // The heart of #72's continuous compatibility: familiarity desensitises a clash you like, hypersensitises one you don't.
+            yield return new SynapseTestCase("Psychology_Compat_FamiliarityDesensitisesOrHypersensitises", () =>
+            {
+                float rate = SynapseCompatibility.DriftRate;
+                // Positive compatibility is steady — liking someone who fits isn't modulated by familiarity/valence.
+                Assert.True(System.Math.Abs(SynapseCompatibility.EffectivePull(0.5f, 100f, 50f) - 0.5f * rate) < 0.001f, "kinship pull is steady");
+                Assert.True(System.Math.Abs(SynapseCompatibility.EffectivePull(0.5f, 0f, -50f) - 0.5f * rate) < 0.001f, "kinship pull ignores familiarity/valence");
+                // A clash, unfamiliar: full bite, no modulation.
+                Assert.True(System.Math.Abs(SynapseCompatibility.EffectivePull(-0.5f, 0f, 0f) - (-0.5f * rate)) < 0.001f, "an unfamiliar clash bites fully");
+                // A clash you currently LIKE + very familiar → desensitised (dampened).
+                float desens = SynapseCompatibility.EffectivePull(-0.5f, 100f, 20f);
+                Assert.True(desens > -0.5f * rate && desens < 0f, $"a valued, familiar clash is dampened (got {desens:F2} vs full {-0.5f*rate:F2})");
+                // A clash you currently DISLIKE + very familiar → hypersensitised (amplified beyond full).
+                float hyper = SynapseCompatibility.EffectivePull(-0.5f, 100f, -20f);
+                Assert.True(hyper < -0.5f * rate, $"a resented, familiar clash grates harder than full (got {hyper:F2})");
+                return $"kinship steady; clash bite: unfamiliar {-0.5f*rate:F2}, liked/familiar {desens:F2}, disliked/familiar {hyper:F2}";
+            },
+            tier: "Execution", polarity: "positive",
+            scenario: "The same personality clash, between friends vs between enemies, as familiarity grows",
+            expectation: "Friends grow to overlook it; enemies grow to resent it more");
+
+            // Compatibility is symmetric and bounded on real pawns, and recomputed live (not frozen).
+            yield return new SynapseTestCase("Psychology_Compat_ScoreSymmetricAndInRange",
+                () =>
+                {
+                    var map = Find.CurrentMap ?? Find.Maps.FirstOrDefault();
+                    var cs = map.mapPawns.FreeColonists.ToList();
+                    for (int i = 0; i < cs.Count; i++)
+                        for (int j = i + 1; j < cs.Count; j++)
+                        {
+                            float ab = SynapseCompatibility.Score(cs[i], cs[j]);
+                            float ba = SynapseCompatibility.Score(cs[j], cs[i]);
+                            Assert.True(ab >= -1f && ab <= 1f, $"compat in [-1,1] (got {ab:F2})");
+                            Assert.True(System.Math.Abs(ab - ba) < 0.001f, "compat is symmetric");
+                        }
+                    return $"{cs.Count} colonist(s): all pair compat values symmetric and in range";
+                },
+                skipReason: () =>
+                {
+                    var map = Find.CurrentMap ?? Find.Maps?.FirstOrDefault();
+                    var cs = map?.mapPawns?.FreeColonists;
+                    return (cs != null && cs.Count >= 2) ? null : "need two colonists";
+                },
+                tier: "Execution", polarity: "positive",
+                scenario: "Real colonists' personalities are compared",
+                expectation: "Compatibility is symmetric and within [-1, 1]");
         }
 
         private static string SharedVictoryBondsNearbyFighters()
