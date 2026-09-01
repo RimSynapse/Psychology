@@ -13,6 +13,34 @@ namespace RimSynapse.Psychology.API
     /// </summary>
     public static class SynapseRelationships
     {
+        /// <summary>Get-or-create just the <paramref name="from"/> → <paramref name="to"/> directed record, or
+        /// null if it can't hold one. For ASYMMETRIC feelings — jealousy, a one-sided grudge — where one pawn
+        /// resents another who may be oblivious.</summary>
+        public static SocialRecord TryDirected(Pawn from, Pawn to)
+        {
+            if (from == null || to == null || from == to) return null;
+            var comp = from.GetComp<SynapsePawnComp>();
+            if (comp == null || to.GetComp<SynapsePawnComp>() == null) return null;
+            string idTo = to.GetUniqueLoadID();
+            if (!comp.socialNetwork.TryGetValue(idTo, out var rec)) { rec = new SocialRecord(); comp.socialNetwork[idTo] = rec; }
+            return rec;
+        }
+
+        /// <summary>Move ONLY <paramref name="from"/>'s trust toward <paramref name="to"/> (one-sided). Negative
+        /// amounts sour it — e.g. jealousy or a betrayal felt by one side alone.</summary>
+        public static void AwardTrustDirected(Pawn from, Pawn to, float amount)
+        {
+            if (amount == 0f) return;
+            TryDirected(from, to)?.AddTrust(amount);
+        }
+
+        /// <summary>Move ONLY <paramref name="from"/>'s warmth toward <paramref name="to"/> (one-sided).</summary>
+        public static void AwardWarmthDirected(Pawn from, Pawn to, float amount)
+        {
+            if (amount == 0f) return;
+            TryDirected(from, to)?.AddWarmth(amount);
+        }
+
         /// <summary>Get-or-create both directed records for a pair, or (null, null) if either side can't hold one.</summary>
         public static bool TryPair(Pawn a, Pawn b, out SocialRecord recA, out SocialRecord recB)
         {

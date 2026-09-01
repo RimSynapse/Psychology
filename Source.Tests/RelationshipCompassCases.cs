@@ -59,6 +59,101 @@ namespace RimSynapse.Psychology.Tests
                 tier: "Execution", polarity: "positive",
                 scenario: "A trust/warmth source awards a pair",
                 expectation: "Both sides of the relationship move by the same amount; self/null award nothing");
+
+            // Directed award moves ONLY one side — the asymmetry jealousy/grudges need (A resents B; B oblivious).
+            yield return new SynapseTestCase("Psychology_Compass_DirectedAwardIsOneSided",
+                DirectedAwardIsOneSided,
+                skipReason: () =>
+                {
+                    var map = Find.CurrentMap ?? Find.Maps?.FirstOrDefault();
+                    var cs = map?.mapPawns?.FreeColonists;
+                    return (cs != null && cs.Count >= 2) ? null : "need two colonists";
+                },
+                tier: "Execution", polarity: "positive",
+                scenario: "A resents B (jealousy) while B is oblivious",
+                expectation: "Only A→B trust/warmth moves; B→A is untouched");
+
+            // The compulsion gate: a feeling only erupts into action when it's strong AND the pawn is volatile.
+            yield return new SynapseTestCase("Psychology_Compulsion_GateNeedsStrongFeelingAndLowControl", () =>
+            {
+                // Max feeling, fully volatile -> acts. Max feeling, controlled -> suppressed. Weak feeling -> never.
+                Assert.True(SynapseCompulsion.WouldActOn(1.0f, 0.0f), "a strong feeling in a volatile pawn erupts");
+                Assert.False(SynapseCompulsion.WouldActOn(1.0f, 0.9f), "the same strong feeling in a controlled pawn is suppressed");
+                Assert.False(SynapseCompulsion.WouldActOn(0.3f, 0.0f), "a weak feeling never erupts, even in a volatile pawn");
+                Assert.True(System.Math.Abs(SynapseCompulsion.Drive(1f, 0f) - 1f) < 0.001f, "drive is max when volatile + strong");
+                Assert.True(System.Math.Abs(SynapseCompulsion.Drive(1f, 1f)) < 0.001f, "drive is zero when fully controlled");
+                return "gate: strong+volatile acts; controlled or weak does not";
+            },
+            tier: "Execution", polarity: "positive",
+            scenario: "Two pawns feel the same resentment; one is volatile, one is controlled",
+            expectation: "Only the volatile pawn acts on it; a weak feeling never acts");
+
+            // Effective control uses the LLM-stored override when set, else the deterministic baseline; clamped.
+            yield return new SynapseTestCase("Psychology_Compulsion_EffectiveUsesOverrideElseBaseline", () =>
+            {
+                Assert.True(System.Math.Abs(SynapseCompulsion.Effective(null, new SynapsePawnComp { compulsionControl = 0.8f }) - 0.8f) < 0.001f,
+                    "a stored (LLM-refined) value is used verbatim");
+                Assert.True(System.Math.Abs(SynapseCompulsion.Effective(null, new SynapsePawnComp { compulsionControl = 5f }) - 1f) < 0.001f,
+                    "a stored value is clamped to [0,1]");
+                Assert.True(System.Math.Abs(SynapseCompulsion.Effective(null, new SynapsePawnComp()) - 0.5f) < 0.001f,
+                    "the sentinel -1 falls back to the baseline (0.5 with no mental breaker)");
+                return "override honoured; -1 sentinel falls back to baseline";
+            },
+            tier: "Execution", polarity: "positive",
+            scenario: "The LLM eval has (or hasn't) refined a pawn's temperament",
+            expectation: "Triggers read the stored value when present, else the trait baseline");
+
+            // Baseline from real pawns stays in range and reflects volatility (steadier pawns score higher).
+            yield return new SynapseTestCase("Psychology_Compulsion_BaselineInRange",
+                () =>
+                {
+                    var map = Find.CurrentMap ?? Find.Maps.FirstOrDefault();
+                    var colonists = map.mapPawns.FreeColonists.ToList();
+                    foreach (var c in colonists)
+                    {
+                        float ctrl = SynapseCompulsion.Baseline(c);
+                        Assert.True(ctrl >= 0f && ctrl <= 1f, $"{c.LabelShort} control baseline is in [0,1] (got {ctrl:F2})");
+                    }
+                    return $"{colonists.Count} colonist control baseline(s) in range";
+                },
+                skipReason: () =>
+                {
+                    var map = Find.CurrentMap ?? Find.Maps?.FirstOrDefault();
+                    var cs = map?.mapPawns?.FreeColonists;
+                    return (cs != null && cs.Count >= 1) ? null : "need a colonist";
+                },
+                tier: "Execution", polarity: "positive",
+                scenario: "Real colonists' control is derived from their stability traits",
+                expectation: "Every pawn's baseline is a valid [0,1] control value");
+        }
+
+        private static string DirectedAwardIsOneSided()
+        {
+            var map = Find.CurrentMap ?? Find.Maps.FirstOrDefault();
+            var colonists = map.mapPawns.FreeColonists.ToList();
+            var a = colonists[0];
+            var b = colonists[1];
+            var compA = a.GetComp<SynapsePawnComp>();
+            var compB = b.GetComp<SynapsePawnComp>();
+            string idA = a.GetUniqueLoadID(), idB = b.GetUniqueLoadID();
+
+            compA.socialNetwork.TryGetValue(idB, out var priorA);
+            compB.socialNetwork.TryGetValue(idA, out var priorB);
+            float t0a = priorA?.trust ?? 0f, t0b = priorB?.trust ?? 0f;
+            try
+            {
+                SynapseRelationships.AwardTrustDirected(a, b, -8f); // A's jealous resentment of B
+                var recA = compA.socialNetwork[idB];
+                Assert.True(System.Math.Abs((recA.trust - t0a) + 8f) < 0.001f, "A→B trust soured by 8");
+                float bToA = compB.socialNetwork.TryGetValue(idA, out var recB) ? recB.trust : t0b;
+                Assert.True(System.Math.Abs(bToA - t0b) < 0.001f, "B→A trust is untouched — B doesn't know");
+                return "A's resentment moved only A→B; B unaffected";
+            }
+            finally
+            {
+                if (priorA != null) priorA.trust = t0a; else compA.socialNetwork.Remove(idB);
+                if (priorB == null) compB.socialNetwork.Remove(idA);
+            }
         }
 
         private static string AwardIsSymmetric()

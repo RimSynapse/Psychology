@@ -563,6 +563,41 @@ namespace RimSynapse.Psychology.Utils
                 $"  PER SESSION: Δ should equal ONE session's award (3), NOT {wounds}× it — {(System.Math.Abs(delta - 3f) < 0.01f ? "PASS" : "CHECK")}.");
         }
 
+        /// <summary>#72: dump the clicked pawn's compulsion control (emotional brake) and whether their strongest
+        /// negative feeling toward another colonist would ERUPT into an action — plus what a fully volatile vs
+        /// fully controlled pawn would do with that same feeling, to show the gate at work.</summary>
+        [DebugAction("RimSynapse", "Relationships: compulsion control dump (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void CompulsionControlDump(Pawn p)
+        {
+            if (p == null) return;
+            var comp = p.GetComp<SynapsePawnComp>();
+            if (comp == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no SynapsePawnComp."); return; }
+
+            float control = SynapseCompulsion.Effective(p, comp);
+            float baseline = SynapseCompulsion.Baseline(p);
+            string source = comp.compulsionControl >= 0f ? $"LLM-refined {comp.compulsionControl:F2}" : "trait baseline";
+
+            // Strongest dislike: the lowest (most negative) warmth record.
+            Pawn worst = null; float worstWarmth = 0f;
+            foreach (var kv in comp.socialNetwork)
+                if (kv.Value != null && kv.Value.warmth < worstWarmth)
+                {
+                    var t = (p.Map?.mapPawns?.AllPawns ?? System.Linq.Enumerable.Empty<Pawn>())
+                        .FirstOrDefault(x => x.GetUniqueLoadID() == kv.Key);
+                    if (t != null) { worst = t; worstWarmth = kv.Value.warmth; }
+                }
+
+            float magnitude = worst != null ? (-worstWarmth) / 100f : 0f;
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Compulsion control for {p.LabelShort} ---\n" +
+                $"  control = {control:F2} ({source}); baseline from traits = {baseline:F2}   (0 = volatile, 1 = controlled)\n" +
+                (worst == null
+                    ? "  no disliked colonist on record yet — nothing to act on."
+                    : $"  strongest dislike: {worst.LabelShort} (warmth {worstWarmth:F0}, magnitude {magnitude:F2})\n" +
+                      $"  drive to act = {SynapseCompulsion.Drive(magnitude, control):F2} (threshold {SynapseCompulsion.ActThreshold:F2}) → {(SynapseCompulsion.WouldActOn(magnitude, control) ? "ERUPTS" : "suppressed")}\n" +
+                      $"  same feeling if fully VOLATILE(0): {(SynapseCompulsion.WouldActOn(magnitude, 0f) ? "erupts" : "no")}; fully CONTROLLED(1): {(SynapseCompulsion.WouldActOn(magnitude, 1f) ? "erupts" : "no")}"));
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpVoice(Pawn p)
         {
