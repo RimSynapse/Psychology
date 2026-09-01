@@ -654,6 +654,22 @@ namespace RimSynapse.Psychology.Utils
             RimSynapse.SynapseLogger.Info("psychology", sb.ToString());
         }
 
+        /// <summary>#72: fire the clicked pawn's nightly relationship review now (the LLM reconsiders how they
+        /// feel about the people they know, and the result is applied — bounded, directed, gated). Resets the
+        /// once-a-day guard so it can be re-run.</summary>
+        [DebugAction("RimSynapse", "Relationships: run nightly review (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void RunRelationshipReview(Pawn p)
+        {
+            if (p == null) return;
+            var comp = p.GetComp<SynapsePawnComp>();
+            if (comp != null) comp.lastRelationshipReviewDay = -1;
+            bool queued = SynapsePsychology.QueueRelationshipReview(p);
+            RimSynapse.SynapseLogger.Info("psychology",
+                queued
+                    ? $"[RimSynapse] Relationship review queued for {p.LabelShort} — watch the log for the applied result."
+                    : $"[RimSynapse] {p.LabelShort} has no significant relationships to reconsider yet.");
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpVoice(Pawn p)
         {

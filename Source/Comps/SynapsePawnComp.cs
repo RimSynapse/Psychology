@@ -78,6 +78,10 @@ namespace RimSynapse.Psychology.Comps
         /// refine a pawn's temperament; the C# triggers only ever READ the effective value.</summary>
         public float compulsionControl = -1f;
 
+        /// <summary>Day the nightly relationship review last ran for this pawn (#72), so it fires at most once a
+        /// day after their personality eval — not on every opportunistic tick.</summary>
+        public int lastRelationshipReviewDay = -1;
+
         // Stage 2: cooldown gate between AI-driven trait changes (#46). Absolute tick of the last change.
         public long lastTraitChangeTick = -1;
 
@@ -120,6 +124,7 @@ namespace RimSynapse.Psychology.Comps
             if (therapyTranscripts == null) therapyTranscripts = new List<RimSynapse.Psychology.Models.TherapyTranscript>();
             Scribe_Values.Look(ref savedAverageMood, "savedAverageMood", 0.5f);
             Scribe_Values.Look(ref compulsionControl, "compulsionControl", -1f);
+            Scribe_Values.Look(ref lastRelationshipReviewDay, "lastRelationshipReviewDay", -1);
             Scribe_Values.Look(ref lastTraitChangeTick, "lastTraitChangeTick", -1L);
             Scribe_Collections.Look(ref copingStates, "copingStates", LookMode.Deep);
             Scribe_Collections.Look(ref aversionRecurrence, "aversionRecurrence", LookMode.Value, LookMode.Value);
