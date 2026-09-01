@@ -1,3 +1,4 @@
+using RimWorld;
 using Verse;
 using RimSynapse.Psychology.Comps;
 using RimSynapse.Psychology.Models;
@@ -39,6 +40,29 @@ namespace RimSynapse.Psychology.API
         {
             if (amount == 0f) return;
             TryDirected(from, to)?.AddWarmth(amount);
+        }
+
+        /// <summary>
+        /// Shared victory (#72): a colonist felled a threat — the colleagues who were drafted and fighting near
+        /// the kill went through it together, so each gains mutual trust with the killer. Nothing bonds pawns
+        /// like surviving a fight side by side. Returns how many allies bonded.
+        /// </summary>
+        public static int AwardSharedVictory(Pawn killer, Map map, IntVec3 at, float radius, float amount)
+        {
+            if (killer == null || map == null) return 0;
+            var player = Faction.OfPlayerSilentFail;
+            if (player == null) return 0;
+            int bonded = 0;
+            foreach (var ally in map.mapPawns.SpawnedPawnsInFaction(player))
+            {
+                if (ally == killer || !ally.IsColonist) continue;
+                if (ally.Drafted && ally.Position.InHorDistOf(at, radius))
+                {
+                    AwardTrust(killer, ally, amount);
+                    bonded++;
+                }
+            }
+            return bonded;
         }
 
         /// <summary>Get-or-create both directed records for a pair, or (null, null) if either side can't hold one.</summary>

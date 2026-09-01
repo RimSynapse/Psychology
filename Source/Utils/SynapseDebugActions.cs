@@ -598,6 +598,35 @@ namespace RimSynapse.Psychology.Utils
                       $"  same feeling if fully VOLATILE(0): {(SynapseCompulsion.WouldActOn(magnitude, 0f) ? "erupts" : "no")}; fully CONTROLLED(1): {(SynapseCompulsion.WouldActOn(magnitude, 1f) ? "erupts" : "no")}"));
         }
 
+        /// <summary>#72: simulate a shared victory — the clicked pawn "kills a threat" and every drafted colonist
+        /// near them bonds (trust) with them. Temporarily drafts the nearest colonist so there's someone to bond
+        /// with, awards, reports, and restores draft state.</summary>
+        [DebugAction("RimSynapse", "Relationships: shared victory bonds fighters (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void SharedVictoryBond(Pawn p)
+        {
+            if (p?.Map == null) return;
+            var ally = p.Map.mapPawns.FreeColonists.FirstOrDefault(c => c != p && c.drafter != null);
+            if (ally == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort}: need a second draftable colonist."); return; }
+
+            var compP = p.GetComp<SynapsePawnComp>();
+            if (compP == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no SynapsePawnComp."); return; }
+            string idAlly = ally.GetUniqueLoadID();
+            compP.socialNetwork.TryGetValue(idAlly, out var before);
+            float t0 = before?.trust ?? 0f;
+            bool wasDrafted = ally.drafter.Drafted;
+            try
+            {
+                ally.drafter.Drafted = true;
+                int bonded = SynapseRelationships.AwardSharedVictory(p, p.Map, ally.Position, 18f, 2f);
+                float t1 = compP.socialNetwork.TryGetValue(idAlly, out var after) ? after.trust : t0;
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"--- Shared victory for {p.LabelShort} ---\n" +
+                    $"  {bonded} drafted colleague(s) near the kill bonded; {p.LabelShort}↔{ally.LabelShort} trust {t0:F0} -> {t1:F0}.\n" +
+                    "  (Only drafted colonists within 18 tiles of the kill bond — surviving the fight together.)");
+            }
+            finally { ally.drafter.Drafted = wasDrafted; }
+        }
+
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpVoice(Pawn p)
         {
