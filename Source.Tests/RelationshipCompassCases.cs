@@ -185,6 +185,102 @@ namespace RimSynapse.Psychology.Tests
                 tier: "Execution", polarity: "positive",
                 scenario: "Real colonists' personalities are compared",
                 expectation: "Compatibility is symmetric and within [-1, 1]");
+
+            // The tough gate: rivalry/betrayal only qualify when the relationship's state earns them.
+            yield return new SynapseTestCase("Psychology_RelReview_RivalryAndBetrayalGates", () =>
+            {
+                // Betrayal needs prior trust AND a real breach this night.
+                Assert.True(SynapseRelationshipReview.QualifiesAsBetrayal(30f, -20f), "a real breach of a trusted bond is betrayal");
+                Assert.False(SynapseRelationshipReview.QualifiesAsBetrayal(10f, -20f), "you can't betray someone who didn't trust you");
+                Assert.False(SynapseRelationshipReview.QualifiesAsBetrayal(30f, -5f), "a minor slight isn't betrayal");
+                // Rivalry needs sustained, deep, familiar antagonism.
+                Assert.True(SynapseRelationshipReview.QualifiesAsRivalry(-60f, 70f, -10f), "deep cold + well-known + no trust = rivalry");
+                Assert.False(SynapseRelationshipReview.QualifiesAsRivalry(-60f, 20f, 0f), "you can't have a rivalry with someone you barely know");
+                Assert.False(SynapseRelationshipReview.QualifiesAsRivalry(-10f, 70f, 0f), "mild dislike isn't rivalry");
+                return "betrayal/rivalry gates hold";
+            },
+            tier: "Execution", polarity: "negative",
+            scenario: "The eval proposes rivalry or betrayal",
+            expectation: "It only qualifies with a genuinely earned relationship state, never over something small");
+
+            // Parsing tolerates garbage and reads a well-formed result.
+            yield return new SynapseTestCase("Psychology_RelReview_ParseTolerant", () =>
+            {
+                Assert.True(SynapseRelationshipReview.Parse(null) == null, "null content parses to null, no throw");
+                Assert.True(SynapseRelationshipReview.Parse("not json at all") == null, "garbage parses to null");
+                var r = SynapseRelationshipReview.Parse("{\"compulsionControl\":0.2,\"relationships\":[{\"who\":\"Bob\",\"warmthDelta\":-6,\"trustDelta\":-3,\"reason\":\"x\",\"kind\":\"jealousy\"}]}");
+                Assert.NotNull(r, "well-formed JSON parses");
+                Assert.True(r.compulsionControl.HasValue && System.Math.Abs(r.compulsionControl.Value - 0.2f) < 0.001f, "compulsionControl read");
+                Assert.Equal(1, r.relationships.Count, "one relationship read");
+                Assert.Equal("Bob", r.relationships[0].who, "target read");
+                return "parse: null/garbage safe; valid read";
+            },
+            tier: "Execution", polarity: "positive",
+            scenario: "The eval returns JSON (or garbage)",
+            expectation: "Well-formed results parse; malformed ones return null without throwing");
+
+            // Apply writes control, applies bounded DIRECTED deltas, and downgrades an unearned rivalry to friction.
+            yield return new SynapseTestCase("Psychology_RelReview_ApplyBoundedDirectedAndGated",
+                ApplyBoundedDirectedAndGated,
+                skipReason: () =>
+                {
+                    var map = Find.CurrentMap ?? Find.Maps?.FirstOrDefault();
+                    var cs = map?.mapPawns?.FreeColonists;
+                    return (cs != null && cs.Count >= 2) ? null : "need two colonists";
+                },
+                tier: "Execution", polarity: "positive",
+                scenario: "A parsed review is applied to a colonist",
+                expectation: "Control is written; deltas apply directed and bounded; an unearned rivalry becomes friction");
+        }
+
+        private static string ApplyBoundedDirectedAndGated()
+        {
+            var map = Find.CurrentMap ?? Find.Maps.FirstOrDefault();
+            var colonists = map.mapPawns.FreeColonists.ToList();
+            var a = colonists[0];
+            var b = colonists[1];
+            var compA = a.GetComp<SynapsePawnComp>();
+            var compB = b.GetComp<SynapsePawnComp>();
+            string idB = b.GetUniqueLoadID(), idA = a.GetUniqueLoadID();
+            compA.socialNetwork.TryGetValue(idB, out var priorAB);
+            compB.socialNetwork.TryGetValue(idA, out var priorBA);
+            float ctrl0 = compA.compulsionControl;
+            float w0AB = priorAB?.warmth ?? 0f, t0AB = priorAB?.trust ?? 0f;
+            try
+            {
+                // Fresh pair (low familiarity), so a proposed "rivalry" must NOT qualify -> downgraded to friction.
+                var result = new RelationshipReviewResult
+                {
+                    compulsionControl = 0.25f,
+                    relationships = new List<RelationshipDelta>
+                    {
+                        new RelationshipDelta { who = "TARGET", warmthDelta = -100f, trustDelta = -4f, reason = "cold read", kind = "rivalry" }
+                    }
+                };
+                var applied = SynapseRelationshipReview.Apply(a, result, _ => b);
+                Assert.Equal(1, applied.Count, "one relationship applied");
+                Assert.Equal("friction", applied[0], "an unearned rivalry (fresh pair) is downgraded to friction");
+                Assert.True(System.Math.Abs(compA.compulsionControl - 0.25f) < 0.001f, "the LLM-refined compulsion control is stored");
+
+                var recAB = compA.socialNetwork[idB];
+                Assert.True(System.Math.Abs(recAB.warmth - ((priorAB?.warmth ?? 0f) - SynapseRelationshipReview.MaxNightlyDelta)) < 0.001f,
+                    "warmth delta is clamped to the nightly bound (-12), not -100");
+                // Directed: B's record toward A is untouched by A's review.
+                float bToAWarmth = compB.socialNetwork.TryGetValue(idA, out var recBA) ? recBA.warmth : (priorBA?.warmth ?? 0f);
+                Assert.True(System.Math.Abs(bToAWarmth - (priorBA?.warmth ?? 0f)) < 0.001f, "B→A is untouched — the review is one-sided");
+                return "control stored; warmth clamped to -12; rivalry gated to friction; directed";
+            }
+            finally
+            {
+                compA.compulsionControl = ctrl0;
+                if (priorAB != null)
+                {
+                    priorAB.warmth = w0AB; priorAB.trust = t0AB;
+                    priorAB.relationshipMemories.Remove("cold read");
+                }
+                else compA.socialNetwork.Remove(idB);
+                if (priorBA == null) compB.socialNetwork.Remove(idA);
+            }
         }
 
         private static string SharedVictoryBondsNearbyFighters()
