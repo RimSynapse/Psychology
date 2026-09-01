@@ -39,6 +39,9 @@ namespace RimSynapse.Psychology.API
         private const float KinWeight = 0.30f;
         private const float MoodKinWeight = 0.20f;
         private const float PassionKinWeight = 0.25f;
+        // Ideology is a BIG part of who a pawn is (#72): shared faith is a strong bond, opposed faith a strong rift.
+        private const float IdeoKinWeight = 0.35f;
+        private const float IdeoClashWeight = 0.35f;
 
         /// <summary>
         /// Compatibility of A and B from current traits, in [-1, 1]: negative = clash, positive = kinship.
@@ -78,6 +81,18 @@ namespace RimSynapse.Psychology.API
 
             // A shared strong passion — they love the same craft.
             if (SharesStrongPassion(a, b)) { score += PassionKinWeight; reasons?.Add("+shared passion"); }
+
+            // Ideology (Ideology DLC): shared faith is a deep bond; opposed faith a deep rift — and it's the hinge
+            // for conversion/recruitment (#72). Guarded so no-Ideology saves are unaffected.
+            if (ModsConfig.IdeologyActive)
+            {
+                var ia = a.Ideo; var ib = b.Ideo;
+                if (ia != null && ib != null)
+                {
+                    if (ia == ib) { score += IdeoKinWeight; reasons?.Add("+same faith"); }
+                    else { score -= IdeoClashWeight; reasons?.Add("-opposed faiths"); }
+                }
+            }
 
             return Clamp(score, -1f, 1f);
         }
