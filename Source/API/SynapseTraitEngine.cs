@@ -61,7 +61,12 @@ namespace RimSynapse.Psychology.API
             // #72: drift relationships toward what personalities currently imply — recomputed live so trait
             // shifts move it, and modulated by familiarity/valence (desensitise a valued bond, hypersensitise a
             // resented one). Runs on the same daily cadence as the trait pass.
-            SynapseCompatibility.ApplyDailyDrift(pawn, pawn.TryGetComp<RimSynapse.Psychology.Comps.SynapsePawnComp>());
+            var psychComp = pawn.TryGetComp<RimSynapse.Psychology.Comps.SynapsePawnComp>();
+            SynapseCompatibility.ApplyDailyDrift(pawn, psychComp);
+
+            // #72: faith drifts toward the people you love — erode certainty per the LLM susceptibility gate ×
+            // the compass (Ideology-only; no-op otherwise). When it bottoms out, vanilla converts them.
+            SynapseConversion.DriveDaily(pawn, psychComp);
         }
 
         private static int HardenAfterBreaks => Settings?.hardenAfterBreaks ?? 3; // repeated breaks before permanent

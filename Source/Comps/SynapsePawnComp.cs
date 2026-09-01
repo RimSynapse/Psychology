@@ -82,6 +82,12 @@ namespace RimSynapse.Psychology.Comps
         /// day after their personality eval — not on every opportunistic tick.</summary>
         public int lastRelationshipReviewDay = -1;
 
+        /// <summary>How open this pawn is to changing faith, 0..1 (#72). The LLM eval DETERMINES this gate (is
+        /// their certainty wavering, given their bonds + character); the C# driver then erodes their ideoligion
+        /// Certainty each day scaled by it × their warmth toward colonists of the colony's faith. 0 = unshakeable
+        /// (no drift no matter how many friends they make). Ideology-only; harmless otherwise.</summary>
+        public float conversionSusceptibility = 0f;
+
         // Stage 2: cooldown gate between AI-driven trait changes (#46). Absolute tick of the last change.
         public long lastTraitChangeTick = -1;
 
@@ -125,6 +131,7 @@ namespace RimSynapse.Psychology.Comps
             Scribe_Values.Look(ref savedAverageMood, "savedAverageMood", 0.5f);
             Scribe_Values.Look(ref compulsionControl, "compulsionControl", -1f);
             Scribe_Values.Look(ref lastRelationshipReviewDay, "lastRelationshipReviewDay", -1);
+            Scribe_Values.Look(ref conversionSusceptibility, "conversionSusceptibility", 0f);
             Scribe_Values.Look(ref lastTraitChangeTick, "lastTraitChangeTick", -1L);
             Scribe_Collections.Look(ref copingStates, "copingStates", LookMode.Deep);
             Scribe_Collections.Look(ref aversionRecurrence, "aversionRecurrence", LookMode.Value, LookMode.Value);
