@@ -125,6 +125,53 @@ namespace RimSynapse.Psychology.Tests
                 tier: "Execution", polarity: "positive",
                 scenario: "Real colonists' control is derived from their stability traits",
                 expectation: "Every pawn's baseline is a valid [0,1] control value");
+
+            // Shared victory: a drafted colleague near the kill bonds (trust) with the killer; null/empty is safe.
+            yield return new SynapseTestCase("Psychology_Compass_SharedVictoryBondsNearbyFighters",
+                SharedVictoryBondsNearbyFighters,
+                skipReason: () =>
+                {
+                    var map = Find.CurrentMap ?? Find.Maps?.FirstOrDefault();
+                    var cs = map?.mapPawns?.FreeColonists?.Where(c => c.drafter != null).ToList();
+                    return (cs != null && cs.Count >= 2) ? null : "need two draftable colonists";
+                },
+                tier: "Execution", polarity: "positive",
+                scenario: "A colonist fells a threat while a colleague fights nearby",
+                expectation: "The nearby drafted colleague gains trust with the killer; null/empty inputs are safe");
+        }
+
+        private static string SharedVictoryBondsNearbyFighters()
+        {
+            Assert.Equal(0, SynapseRelationships.AwardSharedVictory(null, null, default, 18f, 2f), "null inputs bond nobody, no throw");
+
+            var map = Find.CurrentMap ?? Find.Maps.FirstOrDefault();
+            var colonists = map.mapPawns.FreeColonists.Where(c => c.drafter != null).ToList();
+            var killer = colonists[0];
+            var ally = colonists[1];
+            var compK = killer.GetComp<SynapsePawnComp>();
+            string idAlly = ally.GetUniqueLoadID();
+            compK.socialNetwork.TryGetValue(idAlly, out var prior);
+            float t0 = prior?.trust ?? 0f;
+            bool wasDrafted = ally.drafter.Drafted;
+            try
+            {
+                ally.drafter.Drafted = true; // the colleague is in the fight
+                // Evaluate the shared victory at the ally's own cell, so distance is 0 and only the "drafted +
+                // near" filter is under test (not pawn placement).
+                int bonded = SynapseRelationships.AwardSharedVictory(killer, map, ally.Position, 18f, 5f);
+                Assert.True(bonded >= 1, $"at least the nearby drafted ally bonds (got {bonded})");
+                float after = compK.socialNetwork[idAlly].trust;
+                Assert.True(System.Math.Abs((after - t0) - 5f) < 0.001f, "the killer's trust with the drafted ally rose by 5");
+                return $"{bonded} fighter(s) bonded; killer↔ally trust +5";
+            }
+            finally
+            {
+                ally.drafter.Drafted = wasDrafted;
+                if (prior != null) prior.trust = t0; else compK.socialNetwork.Remove(idAlly);
+                var allyComp = ally.GetComp<SynapsePawnComp>();
+                string idKiller = killer.GetUniqueLoadID();
+                if (allyComp != null) { allyComp.socialNetwork.TryGetValue(idKiller, out var back); if (back != null && back.trust == 5f && t0 == 0f) allyComp.socialNetwork.Remove(idKiller); }
+            }
         }
 
         private static string DirectedAwardIsOneSided()
