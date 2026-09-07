@@ -105,6 +105,12 @@ You MUST respond strictly in valid JSON:
                             var parsed = JsonConvert.DeserializeObject<Dictionary<string, List<Dictionary<string, object>>>>(json);
                             if (parsed != null && parsed.ContainsKey("Memories"))
                             {
+                                // #73: the involvement rosters describe the EVENT, not the recipient — the
+                                // same rosters go on every minted memory regardless of which target pawn it's
+                                // for. Core/SynapseCoreMemory.InvolvementOf derives each recipient's tier from
+                                // them, and Core coalesces on sourceEventId. Compute once, reuse for all.
+                                var involvedLoadIds = ResolveSubjectLoadIds(pastEvent, pawns);
+                                var witnessLoadIds = ResolveWitnessLoadIds(pastEvent);
                                 foreach (var memDict in parsed["Memories"])
                                 {
                                     string pawnId = memDict["PawnId"].ToString();
@@ -128,7 +134,13 @@ You MUST respond strictly in valid JSON:
                                             // Key the subject on Core's canonical scheme (GetUniqueLoadID),
                                             // not the ThingID in involvedPawnIds — so this memory consolidates
                                             // with other memories about the same pawn (Core #80).
-                                            subjectPawnIds = ResolveSubjectLoadIds(pastEvent, pawns),
+                                            subjectPawnIds = new List<string>(involvedLoadIds),
+                                            // #73: stamp the event provenance + involvement rosters so Core
+                                            // can coalesce duplicates (sourceEventId) and derive each
+                                            // recipient's tier (involved/witness) via InvolvementOf.
+                                            sourceEventId = pastEvent.eventId,
+                                            involvedPawnIds = new List<string>(involvedLoadIds),
+                                            witnessPawnIds = new List<string>(witnessLoadIds),
                                             absTick = SynapseDateHelper.GameTickToAbsTick(pastEvent.gameTick),
                                             gameTick = pastEvent.gameTick
                                         });
@@ -179,7 +191,7 @@ You MUST respond strictly in valid JSON:
         /// despawned), fall back to resolving the ThingID list against live pawns via Core's
         /// canonical scheme. Core owns the scheme; this producer just leverages it.
         /// </summary>
-        private static List<string> ResolveSubjectLoadIds(PastEvent pastEvent, List<Pawn> livePawns)
+        internal static List<string> ResolveSubjectLoadIds(PastEvent pastEvent, List<Pawn> livePawns)
         {
             if (pastEvent?.involvedPawnLoadIds != null && pastEvent.involvedPawnLoadIds.Count > 0)
                 return new List<string>(pastEvent.involvedPawnLoadIds);
@@ -193,6 +205,27 @@ You MUST respond strictly in valid JSON:
                     string id = RimSynapse.Comps.SynapseCorePawnComp.MemoryPawnId(p);
                     if (!string.IsNullOrEmpty(id) && !ids.Contains(id)) ids.Add(id);
                 }
+            }
+            return ids;
+        }
+
+        /// <summary>
+        /// The canonical (GetUniqueLoadID) roster of the event's WITNESSES (#73). PastEvent stores
+        /// witnesses as ThingIDs only (no canonical list, unlike involvedPawnLoadIds), so resolve each
+        /// ThingID to a live pawn on the current maps and take its canonical id. A witness we cannot
+        /// resolve is DROPPED — never store a raw ThingID here, or it would fail to match the canonical
+        /// scheme Core keys involvement on.
+        /// </summary>
+        internal static List<string> ResolveWitnessLoadIds(PastEvent pastEvent)
+        {
+            var ids = new List<string>();
+            if (pastEvent?.witnessPawnIds == null) return ids;
+            foreach (var thingId in pastEvent.witnessPawnIds)
+            {
+                Pawn p = PawnById(thingId);
+                if (p == null) continue; // unresolvable -> drop rather than store a ThingID
+                string id = RimSynapse.Comps.SynapseCorePawnComp.MemoryPawnId(p);
+                if (!string.IsNullOrEmpty(id) && !ids.Contains(id)) ids.Add(id);
             }
             return ids;
         }

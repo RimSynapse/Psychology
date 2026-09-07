@@ -744,6 +744,94 @@ namespace RimSynapse.Psychology.Utils
                 p.mindState.mentalStateHandler.TryStartMentalState(stateDef, "Debug command", true);
             }
         }
+
+        /// <summary>
+        /// #73: validate the opportunistic-memory event stamping end-to-end. Builds a synthetic
+        /// PastEvent over live colonists — protagonist + participant as INVOLVED (canonical
+        /// involvedPawnLoadIds), a third as WITNESS supplied only as a ThingID (the shape PastEvent
+        /// actually stores) — runs the same resolvers the minting path uses, stamps a WeightedMemory,
+        /// then asserts Core's SynapseCoreMemory.InvolvementOf derives the right tier for each and that
+        /// the witness ThingID was resolved to its canonical LoadId (never stored raw). No-arg, so it is
+        /// headlessly triggerable via the RimAgentic run_debug_action bridge.
+        /// </summary>
+        [DebugAction("RimSynapse", "Psychology: Validate event memory stamping (#73) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateEventMemoryStamping()
+        {
+            var map = Find.CurrentMap;
+            if (map == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse #73] No current map."); return; }
+
+            var colonists = map.mapPawns.FreeColonists.ToList();
+            if (colonists.Count < 3)
+            {
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"[RimSynapse #73] Need >=3 colonists to validate all tiers (have {colonists.Count}). Spawn more, then retry.");
+                return;
+            }
+
+            Pawn protagonist = colonists[0];
+            Pawn participant = colonists[1];
+            Pawn witness = colonists[2];
+            Pawn stranger = colonists.Count > 3 ? colonists[3] : null;
+
+            // Synthetic event: involved carried as canonical LoadIds (as Core captures them at event time);
+            // witness carried ONLY as a ThingID — the exact shape PastEvent.witnessPawnIds stores.
+            var pe = new RimSynapse.Models.PastEvent
+            {
+                eventDescription = "#73 stamping validation",
+                involvedPawnLoadIds = new System.Collections.Generic.List<string>
+                {
+                    protagonist.GetUniqueLoadID(), participant.GetUniqueLoadID()
+                },
+                involvedPawnIds = new System.Collections.Generic.List<string>
+                {
+                    protagonist.ThingID, participant.ThingID
+                },
+                witnessPawnIds = new System.Collections.Generic.List<string> { witness.ThingID }
+            };
+
+            var involvedLoadIds = SynapsePsychology.ResolveSubjectLoadIds(pe, colonists);
+            var witnessLoadIds = SynapsePsychology.ResolveWitnessLoadIds(pe);
+
+            var mem = new WeightedMemory
+            {
+                summary = "#73 stamping validation memory",
+                memoryType = "EventReflection",
+                weight = 0.5f,
+                baseWeight = 0.5f,
+                decayRate = 0.1f,
+                subjectPawnIds = new System.Collections.Generic.List<string>(involvedLoadIds),
+                sourceEventId = pe.eventId,
+                involvedPawnIds = new System.Collections.Generic.List<string>(involvedLoadIds),
+                witnessPawnIds = new System.Collections.Generic.List<string>(witnessLoadIds)
+            };
+
+            var iProt = RimSynapse.SynapseCoreMemory.InvolvementOf(mem, protagonist);
+            var iPart = RimSynapse.SynapseCoreMemory.InvolvementOf(mem, participant);
+            var iWit = RimSynapse.SynapseCoreMemory.InvolvementOf(mem, witness);
+            var iStr = stranger != null ? RimSynapse.SynapseCoreMemory.InvolvementOf(mem, stranger) : RimSynapse.MemoryInvolvement.None;
+
+            bool witnessResolvedToLoadId =
+                witnessLoadIds.Contains(witness.GetUniqueLoadID()) &&
+                !witnessLoadIds.Contains(witness.ThingID);
+
+            bool pass =
+                !string.IsNullOrEmpty(mem.sourceEventId) && mem.sourceEventId == pe.eventId &&
+                iProt == RimSynapse.MemoryInvolvement.Protagonist &&
+                iPart == RimSynapse.MemoryInvolvement.Participant &&
+                iWit == RimSynapse.MemoryInvolvement.Witness &&
+                iStr == RimSynapse.MemoryInvolvement.None &&
+                witnessResolvedToLoadId;
+
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse #73] Event memory stamping validation: {(pass ? "PASS" : "FAIL")}\n" +
+                $"  sourceEventId stamped: {mem.sourceEventId == pe.eventId} ({mem.sourceEventId})\n" +
+                $"  involved roster: [{string.Join(", ", mem.involvedPawnIds)}]\n" +
+                $"  witness roster:  [{string.Join(", ", mem.witnessPawnIds)}] (ThingID->LoadId resolved: {witnessResolvedToLoadId})\n" +
+                $"  {protagonist.LabelShort}: {iProt} [expect Protagonist]\n" +
+                $"  {participant.LabelShort}: {iPart} [expect Participant]\n" +
+                $"  {witness.LabelShort}: {iWit} [expect Witness]\n" +
+                (stranger != null ? $"  {stranger.LabelShort}: {iStr} [expect None]\n" : "  (no 4th colonist to check the None tier)\n"));
+        }
     }
 }
 
