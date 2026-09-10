@@ -17,11 +17,15 @@ namespace RimSynapse.Psychology.Models
         public float familiarity = 0f;
         public System.Collections.Generic.List<string> relationshipMemories = new System.Collections.Generic.List<string>();
 
-        /// <summary>Highest named familiarity milestone this relationship has reached (index into
-        /// <see cref="RimSynapse.Psychology.API.SynapseFamiliarityMilestones.Milestones"/>), or -1 for none (#23).
-        /// Persisted so each threshold notifies the player exactly once — never again on load, and never re-firing
-        /// if familiarity dips below the band and climbs back.</summary>
-        public int highestFamiliarityMilestone = -1;
+        /// <summary>Highest friendship / rivalry band this relationship has reached (indices into
+        /// <see cref="RimSynapse.Psychology.API.SynapseRelationshipMilestones"/>'s two ladders), or -1 for none
+        /// (#72 Phase 4). Persisted so each band notifies the player exactly once — never again on load, and never
+        /// re-firing if the axes dip below a reached band and climb back (hysteresis). <see cref="reconciled"/>
+        /// records that a former rival has already crossed back into friendship, so the reconciliation letter
+        /// fires at most once.</summary>
+        public int highestFriendshipMilestone = -1;
+        public int highestRivalryMilestone = -1;
+        public bool reconciled = false;
 
 
         public SocialRecord()
@@ -48,8 +52,10 @@ namespace RimSynapse.Psychology.Models
             Scribe_Values.Look(ref trust, "trust", 0f);
             Scribe_Values.Look(ref warmth, "warmth", 0f);
             Scribe_Values.Look(ref familiarity, "familiarity", 0f);
-            // Default -1 so a save predating milestones loads as "no milestone reached yet".
-            Scribe_Values.Look(ref highestFamiliarityMilestone, "highestFamiliarityMilestone", -1);
+            // Default -1 so a save predating a ladder loads as "no band reached yet".
+            Scribe_Values.Look(ref highestFriendshipMilestone, "highestFriendshipMilestone", -1);
+            Scribe_Values.Look(ref highestRivalryMilestone, "highestRivalryMilestone", -1);
+            Scribe_Values.Look(ref reconciled, "reconciled", false);
             Scribe_Collections.Look(ref relationshipMemories, "relationshipMemories", LookMode.Value);
             
             if (Scribe.mode == LoadSaveMode.LoadingVars && relationshipMemories == null)

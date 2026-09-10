@@ -529,7 +529,7 @@ namespace RimSynapse.Psychology.UI
                     
                     Rect nameRect = new Rect(60f, curY + 5f, 200f, 20f);
                     Text.Font = GameFont.Small;
-                    string milestone = RimSynapse.Psychology.API.SynapseFamiliarityMilestones.CurrentLabel(record); // #23
+                    string milestone = RimSynapse.Psychology.API.SynapseRelationshipMilestones.CurrentStatus(record); // #72 Phase 4
                     Widgets.Label(nameRect, milestone != null
                         ? $"{targetPawn.Name.ToStringShort}  ·  {milestone}"
                         : targetPawn.Name.ToStringShort);

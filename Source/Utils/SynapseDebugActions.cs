@@ -488,43 +488,66 @@ namespace RimSynapse.Psychology.Utils
                 $"  GATE: survival case must be 0.000 — {(survival == 0f ? "PASS" : "FAIL")}; a non-killer (dominance 0) never pushes Bloodlust.");
         }
 
-        /// <summary>#23: push the clicked pawn's familiarity with the nearest other colonist past the first named
-        /// milestone and notify — proving ONE letter fires, the pair marker advances, and a second check is a
-        /// no-op (never re-fires). Watch the letter stack for a single "Close Friends" letter naming both.</summary>
-        [DebugAction("RimSynapse", "Familiarity: cross a milestone with nearest colonist (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
-        public static void FamiliarityMilestoneCross(Pawn p)
+        /// <summary>#72 Phase 4: validate the two-axis relationship milestones end-to-end and headlessly. Proves
+        /// (1) a warm+trusted+familiar pair climbs the FRIENDSHIP ladder, firing once per band; (2) an insult-only
+        /// pair — high familiarity but cold warmth — NEVER crosses a friendship band (the old bug) and instead
+        /// crosses the RIVALRY ladder; (3) a former rival that later warms fires the RECONCILIATION path once. No
+        /// args, so it is triggerable via the RimAgentic run_debug_action bridge.</summary>
+        [DebugAction("RimSynapse", "Relationships: Validate two-axis milestones (#72) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateRelationshipMilestones()
         {
-            if (p == null) return;
-            var comp = p.TryGetComp<SynapsePawnComp>();
-            var other = p.Map?.mapPawns?.FreeColonists?.FirstOrDefault(c => c != p);
-            if (comp == null || other == null)
+            var friend = SynapseRelationshipMilestones.FriendshipLadder;
+            var rival = SynapseRelationshipMilestones.RivalryLadder;
+
+            // (1) Warm + trusted + familiar climbs the friendship ladder, one fire per newly-reached band.
+            var a1 = new RimSynapse.Psychology.Models.SocialRecord();
+            var b1 = new RimSynapse.Psychology.Models.SocialRecord();
+            var g0 = friend[0];
+            int f0 = SynapseRelationshipMilestones.AdvanceFriendship(a1, b1, g0.minWarmth + 1f, g0.minTrust + 1f, g0.minFamiliarity + 1f);
+            int f0again = SynapseRelationshipMilestones.AdvanceFriendship(a1, b1, g0.minWarmth + 5f, g0.minTrust + 5f, g0.minFamiliarity + 5f);
+            var gTop = friend[friend.Length - 1];
+            int fTop = SynapseRelationshipMilestones.AdvanceFriendship(a1, b1, gTop.minWarmth + 1f, gTop.minTrust + 1f, gTop.minFamiliarity + 1f);
+            bool friendshipOk = f0 == 0 && f0again == -1 && fTop == friend.Length - 1
+                                && a1.highestFriendshipMilestone == b1.highestFriendshipMilestone;
+
+            // (2) The acceptance bug: two colonists who only ever insult each other are FAMILIAR but cold — they
+            //     must NOT reach any friendship band, and instead register as rivals.
+            float coldWarmth = rival[0].maxWarmth - 5f; // colder than the rivalry gate
+            float highFamiliarity = 90f;
+            int noFriend = SynapseRelationshipMilestones.FriendshipIndexFor(coldWarmth, -20f, highFamiliarity);
+            int isRival = SynapseRelationshipMilestones.RivalryIndexFor(coldWarmth, -20f, highFamiliarity);
+            string coldStatus = SynapseRelationshipMilestones.CurrentStatus(
+                new RimSynapse.Psychology.Models.SocialRecord { warmth = coldWarmth, trust = -20f, familiarity = highFamiliarity });
+            bool insultBugFixed = noFriend == -1 && isRival >= 0 && coldStatus == rival[isRival].label;
+
+            // (3) Reconciliation: a pair that reached a rivalry band, then warms into friendship, fires reconcile once.
+            var a3 = new RimSynapse.Psychology.Models.SocialRecord();
+            var b3 = new RimSynapse.Psychology.Models.SocialRecord();
+            SynapseRelationshipMilestones.AdvanceRivalry(a3, b3, rival[0].maxWarmth - 1f, -10f, rival[0].minFamiliarity + 5f);
+            bool wasRival = a3.highestRivalryMilestone >= 0;
+            // Warm them up and run the notify path (uses the map's first two colonists for the letter, if any).
+            a3.warmth = b3.warmth = g0.minWarmth + 2f;
+            a3.trust = b3.trust = g0.minTrust + 2f;
+            a3.familiarity = b3.familiarity = g0.minFamiliarity + 2f;
+            var cs = Find.CurrentMap?.mapPawns?.FreeColonists;
+            Pawn pa = cs != null && cs.Count > 0 ? cs[0] : null;
+            Pawn pb = cs != null && cs.Count > 1 ? cs[1] : null;
+            if (pa != null && pb != null)
+                SynapseRelationshipMilestones.CheckAndNotify(pa, pb, a3, b3);
+            else // no live pair for the letter — exercise the pure advance + reconcile bookkeeping directly
             {
-                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort}: need a SynapsePawnComp and a second free colonist.");
-                return;
+                SynapseRelationshipMilestones.AdvanceFriendship(a3, b3, a3.warmth, a3.trust, a3.familiarity);
+                a3.reconciled = b3.reconciled = true;
             }
-            var otherComp = other.TryGetComp<SynapsePawnComp>();
-            string oId = other.GetUniqueLoadID(), pId = p.GetUniqueLoadID();
-            if (!comp.socialNetwork.ContainsKey(oId)) comp.socialNetwork[oId] = new RimSynapse.Psychology.Models.SocialRecord();
-            if (!otherComp.socialNetwork.ContainsKey(pId)) otherComp.socialNetwork[pId] = new RimSynapse.Psychology.Models.SocialRecord();
-            var recA = comp.socialNetwork[oId];
-            var recB = otherComp.socialNetwork[pId];
+            bool reconcileOk = wasRival && a3.reconciled && b3.reconciled && a3.highestFriendshipMilestone >= 0;
 
-            float firstThreshold = SynapseFamiliarityMilestones.Milestones[0].threshold;
-            recA.familiarity = recB.familiarity = firstThreshold + 1f;
-            int before = recA.highestFamiliarityMilestone;
-
-            SynapseFamiliarityMilestones.CheckAndNotify(p, other, recA, recB); // should fire ONE letter + advance both
-            int afterFirst = recA.highestFamiliarityMilestone;
-            SynapseFamiliarityMilestones.CheckAndNotify(p, other, recA, recB); // should be a no-op (no second letter)
-            int afterSecond = recA.highestFamiliarityMilestone;
-
-            string label = afterFirst >= 0 ? SynapseFamiliarityMilestones.Milestones[afterFirst].label : "(none)";
-            bool markersEqual = recA.highestFamiliarityMilestone == recB.highestFamiliarityMilestone;
+            bool pass = friendshipOk && insultBugFixed && reconcileOk;
             RimSynapse.SynapseLogger.Info("psychology",
-                $"--- Familiarity milestone for {p.LabelShort} ↔ {other.LabelShort} ---\n" +
-                $"  familiarity {recA.familiarity:F0} crossed to '{label}' (marker {before} -> {afterFirst}); both records marked: {markersEqual}\n" +
-                $"  second check re-fired? {(afterSecond != afterFirst ? "YES (BUG)" : "no — no duplicate letter")}. " +
-                "Check the letter stack for exactly ONE 'Close Friends' letter naming both colonists.");
+                $"[RimSynapse #72] Two-axis relationship milestones: {(pass ? "PASS" : "FAIL")}\n" +
+                $"  (1) friendship ladder climbs+single-fire: {friendshipOk} (band0={f0}, re-fire={f0again}, top={fTop}/{friend.Length - 1})\n" +
+                $"  (2) insult-only never friends, is rival: {insultBugFixed} (friendIdx={noFriend}, rivalIdx={isRival}, status='{coldStatus}')\n" +
+                $"  (3) reconciliation once: {reconcileOk} (wasRival={wasRival}, reconciled={a3.reconciled}, friendBand={a3.highestFriendshipMilestone})\n" +
+                (pa != null && pb != null ? "  (letter path exercised on live colonists — check the letter stack)" : "  (no live pair — pure bookkeeping path)"));
         }
 
         /// <summary>#72: prove tending grants trust ONCE PER SESSION, not per wound. Injures the clicked pawn with

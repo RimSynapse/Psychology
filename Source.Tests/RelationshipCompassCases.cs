@@ -21,7 +21,7 @@ namespace RimSynapse.Psychology.Tests
             // The new warmth axis persists alongside trust/familiarity/marker.
             yield return new SynapseTestCase("Psychology_Compass_WarmthRoundTrips", () =>
             {
-                var rec = new SocialRecord { trust = 30f, warmth = -45f, familiarity = 60f, highestFamiliarityMilestone = 1 };
+                var rec = new SocialRecord { trust = 30f, warmth = -45f, familiarity = 60f, highestFriendshipMilestone = 1 };
                 var reloaded = ScribeRoundTrip(rec);
                 Assert.NotNull(reloaded, "record survives a scribe round-trip");
                 Assert.True(System.Math.Abs(reloaded.warmth + 45f) < 0.001f, "warmth survives save/load");

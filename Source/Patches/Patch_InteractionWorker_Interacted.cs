@@ -29,9 +29,6 @@ namespace RimSynapse.Psychology.Patches
             initRec.AddFamiliarity(2f);
             recRec.AddFamiliarity(2f);
 
-            // #23: notify the player once when this pair first crosses a named familiarity milestone.
-            SynapseFamiliarityMilestones.CheckAndNotify(initiator, recipient, initRec, recRec);
-
             var slightDef = DefDatabase<InteractionDef>.GetNamed("Slight", false);
             if (def == InteractionDefOf.DeepTalk)
             {
@@ -61,6 +58,11 @@ namespace RimSynapse.Psychology.Patches
                 if (SynapseCompulsion.WouldActOn(magnitude, SynapseCompulsion.Effective(initiator, initiator.GetComp<SynapsePawnComp>())))
                     SynapseRelationships.AwardWarmthDirected(initiator, recipient, -3f);
             }
+
+            // #72 Phase 4: notify the player once when this pair crosses a new friendship / rivalry band. Checked
+            // AFTER the warmth/trust awards above, since the two-axis milestones gate on those, not on familiarity
+            // alone — so a pair that only ever insults each other can never cross a friendship threshold.
+            SynapseRelationshipMilestones.CheckAndNotify(initiator, recipient, initRec, recRec);
         }
     }
 }
