@@ -274,6 +274,30 @@ namespace RimSynapse.Psychology.Tests
             tier: "Execution", polarity: "positive",
             scenario: "A well-liked prisoner, before vs after converting to the colony's faith",
             expectation: "Resistance softens with warmth, and much faster once they share the faith");
+
+            // Compass view geometry: warmth×trust maps to the right quadrant of the plot, clamped, origin centred.
+            yield return new SynapseTestCase("Psychology_CompassView_PlotAndQuadrant", () =>
+            {
+                var plot = new UnityEngine.Rect(0f, 0f, 200f, 200f); // centre (100,100)
+                var tr = SynapseRelationshipCompass.PlotPoint(50f, 50f, plot);
+                Assert.True(tr.x > 100f && tr.y < 100f, "warm + trusted plots to the top-right");
+                var bl = SynapseRelationshipCompass.PlotPoint(-50f, -50f, plot);
+                Assert.True(bl.x < 100f && bl.y > 100f, "cold + distrusted plots to the bottom-left");
+                var origin = SynapseRelationshipCompass.PlotPoint(0f, 0f, plot);
+                Assert.True(System.Math.Abs(origin.x - 100f) < 0.01f && System.Math.Abs(origin.y - 100f) < 0.01f, "neutral sits at the origin");
+                var clamped = SynapseRelationshipCompass.PlotPoint(999f, 999f, plot);
+                Assert.True(clamped.x <= 200.01f && clamped.y >= -0.01f, "extreme values clamp inside the plot");
+
+                Assert.Equal(CompassQuadrant.Friends, SynapseRelationshipCompass.Quadrant(40f, 40f), "warm + trusted = Friends");
+                Assert.Equal(CompassQuadrant.Enemies, SynapseRelationshipCompass.Quadrant(-40f, -40f), "cold + distrusted = Enemies");
+                Assert.Equal(CompassQuadrant.FondButWary, SynapseRelationshipCompass.Quadrant(40f, -40f), "warm + distrusted = Fond but wary");
+                Assert.Equal(CompassQuadrant.Allies, SynapseRelationshipCompass.Quadrant(-40f, 40f), "cold + trusted = Allies");
+                Assert.Equal(CompassQuadrant.Neutral, SynapseRelationshipCompass.Quadrant(2f, -3f), "within the dead-band = Neutral");
+                return "plot maps to quadrants; clamps; origin centred";
+            },
+            tier: "Execution", polarity: "positive",
+            scenario: "The compass view plots a relationship by its warmth and trust",
+            expectation: "Each pair lands in the correct quadrant, clamped inside the plot");
         }
 
         private static string QueuesOncePerDay()

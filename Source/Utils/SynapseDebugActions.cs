@@ -309,6 +309,31 @@ namespace RimSynapse.Psychology.Utils
             Find.WindowStack.Add(new RimSynapse.Psychology.UI.Dialog_PawnPsychology(p));
         }
 
+        /// <summary>#72: seed the clicked pawn's relationships with one colonist in each compass quadrant
+        /// (Friends / Allies / Fond-but-wary / Enemies) and open the Psychology window, so the Relationship
+        /// Compass on the Profile tab can be eyeballed with real content.</summary>
+        [DebugAction("RimSynapse", "Relationships: seed compass demo + open (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void SeedCompassDemo(Pawn p)
+        {
+            if (p?.Map == null) return;
+            var comp = p.GetComp<SynapsePawnComp>();
+            if (comp == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no SynapsePawnComp."); return; }
+            var others = p.Map.mapPawns.FreeColonists.Where(c => c != p).Take(4).ToList();
+            if (others.Count == 0) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse] Need other colonists to plot."); return; }
+
+            var presets = new (float w, float t)[] { (60f, 55f), (-55f, 50f), (55f, -50f), (-60f, -55f) };
+            for (int i = 0; i < others.Count && i < presets.Length; i++)
+            {
+                string id = others[i].GetUniqueLoadID();
+                if (!comp.socialNetwork.ContainsKey(id)) comp.socialNetwork[id] = new RimSynapse.Psychology.Models.SocialRecord();
+                var rec = comp.socialNetwork[id];
+                rec.warmth = presets[i].w; rec.trust = presets[i].t; rec.familiarity = 60f;
+            }
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse] Seeded {System.Math.Min(others.Count, 4)} compass demo relationship(s) for {p.LabelShort} — opening the Psychology window (Profile tab).");
+            Find.WindowStack.Add(new RimSynapse.Psychology.UI.Dialog_PawnPsychology(p));
+        }
+
         [DebugAction("RimSynapse", "Skill Engine: Dump personality (LLM + Core baseline)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpPersonality(Pawn p)
         {
