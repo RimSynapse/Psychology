@@ -118,9 +118,6 @@ namespace RimSynapse.Psychology.UI
                 totalFormHeight += 20f;
             }
 
-            // Relationship Compass block (#72) — fixed height so the scroll pre-compute stays exact.
-            totalFormHeight += CompassBlockHeight(rect.width - 20f) + 12f;
-
             Rect scrollRect = new Rect(rect.x, profileY, rect.width, rect.yMax - profileY);
             Rect viewRect = new Rect(0f, 0f, rect.width - 20f, totalFormHeight);
 
@@ -247,10 +244,6 @@ namespace RimSynapse.Psychology.UI
                 formY += 10f;
             }
             
-            // === Relationship Compass (#72) — warmth × trust for every colonist they know ===
-            formY += DrawRelationshipCompass(rect.x, formY, viewRect.width, pawnComp) + 12f;
-            Widgets.DrawLineHorizontal(rect.x, formY - 6f, viewRect.width);
-
             // === Patient History (Trait Timeline) ===
             GUI.color = new Color(0.7f, 0.9f, 1f);
             Text.Font = GameFont.Small;
@@ -331,28 +324,46 @@ namespace RimSynapse.Psychology.UI
             Text.Anchor = TextAnchor.UpperCenter; Widgets.Label(new Rect(plot.x, plot.center.y + 1f, side, 14f), "warmth →");
             GUI.color = Color.white; Text.Anchor = oldAnchor; Text.Font = GameFont.Small;
 
-            // Dots — one per known colonist, placed by warmth×trust, sized by familiarity, coloured by quadrant.
-            var colonists = pawn.Map?.mapPawns?.FreeColonists;
-            if (colonists != null && pawnComp.socialNetwork != null)
+            // Dots — one per known person currently on the map (colonists, prisoners, slaves), placed by
+            // warmth×trust, sized by familiarity, coloured by quadrant.
+            var present = pawn.Map?.mapPawns?.AllPawnsSpawned;
+            if (present != null && pawnComp.socialNetwork != null)
             {
                 foreach (var kv in pawnComp.socialNetwork)
                 {
                     var rec = kv.Value;
                     if (rec == null) continue;
-                    var other = colonists.FirstOrDefault(c => c != pawn && c.GetUniqueLoadID() == kv.Key);
+                    var other = present.FirstOrDefault(c => c != pawn && c.RaceProps != null && c.RaceProps.Humanlike && c.GetUniqueLoadID() == kv.Key);
                     if (other == null) continue;
 
                     var q = SynapseRelationshipCompass.Quadrant(rec.warmth, rec.trust);
+                    Color dotCol = SynapseRelationshipCompass.QuadrantColor(q);
                     Vector2 p = SynapseRelationshipCompass.PlotPoint(rec.warmth, rec.trust, plot);
-                    float d = 6f + Mathf.Clamp01(rec.familiarity / 100f) * 5f;
+                    float d = 7f + Mathf.Clamp01(rec.familiarity / 100f) * 5f;
                     Rect dot = new Rect(p.x - d / 2f, p.y - d / 2f, d, d);
 
-                    Widgets.DrawBoxSolid(dot, SynapseRelationshipCompass.QuadrantColor(q));
-                    GUI.color = new Color(0f, 0f, 0f, 0.55f); Widgets.DrawBox(dot); GUI.color = Color.white;
+                    Widgets.DrawBoxSolid(dot, dotCol);
+                    GUI.color = new Color(0f, 0f, 0f, 0.6f); Widgets.DrawBox(dot); GUI.color = Color.white;
+
+                    // Name label, pointing INWARD so it never runs off the plot; tinted to the dot's quadrant.
+                    string nm = other.Name.ToStringShort;
+                    var oldF = Text.Font; var oldA2 = Text.Anchor;
+                    Text.Font = GameFont.Tiny;
+                    float lw = Mathf.Min(Text.CalcSize(nm).x, 96f);
+                    bool leftSide = p.x > plot.center.x;
+                    Rect lbl = leftSide
+                        ? new Rect(dot.x - lw - 4f, p.y - 8f, lw, 16f)
+                        : new Rect(dot.xMax + 4f, p.y - 8f, lw, 16f);
+                    Text.Anchor = leftSide ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft;
+                    GUI.color = new Color(1f, 1f, 1f, 0.28f);
+                    Widgets.Label(new Rect(lbl.x + 1f, lbl.y + 1f, lbl.width, lbl.height), nm); // faint drop-shadow for legibility
+                    GUI.color = new Color(Mathf.Lerp(dotCol.r, 1f, 0.55f), Mathf.Lerp(dotCol.g, 1f, 0.55f), Mathf.Lerp(dotCol.b, 1f, 0.55f));
+                    Widgets.Label(lbl, nm);
+                    GUI.color = Color.white; Text.Font = oldF; Text.Anchor = oldA2;
 
                     string status = SynapseRelationshipMilestones.CurrentStatus(rec) ?? q.ToString();
                     TooltipHandler.TipRegion(dot,
-                        $"{other.Name.ToStringShort}\nWarmth {rec.warmth:F0} · Trust {rec.trust:F0} · Familiarity {rec.familiarity:F0}\n{status}");
+                        $"{nm}\nWarmth {rec.warmth:F0} · Trust {rec.trust:F0} · Familiarity {rec.familiarity:F0}\n{status}");
                 }
             }
             y += side + 10f;
@@ -600,6 +611,12 @@ namespace RimSynapse.Psychology.UI
                 }
             }
 
+            // #72: the relationship compass at the top — the two-axis overview above the detailed list.
+            float compassH = CompassBlockHeight(rect.width);
+            DrawRelationshipCompass(rect.x, rect.y, rect.width, pawnComp);
+            Widgets.DrawLineHorizontal(rect.x, rect.y + compassH + 5f, rect.width);
+            Rect listArea = new Rect(rect.x, rect.y + compassH + 14f, rect.width, rect.height - compassH - 14f);
+
             float viewHeight = 0f;
             foreach (var kvp in pawnComp.socialNetwork)
             {
@@ -611,9 +628,9 @@ namespace RimSynapse.Psychology.UI
                 }
             }
 
-            Rect viewRect = new Rect(0f, 0f, rect.width - 20f, viewHeight);
-            
-            Widgets.BeginScrollView(rect, ref socialScrollPosition, viewRect);
+            Rect viewRect = new Rect(0f, 0f, listArea.width - 20f, viewHeight);
+
+            Widgets.BeginScrollView(listArea, ref socialScrollPosition, viewRect);
             
             float curY = 0f;
             foreach (var kvp in pawnComp.socialNetwork)

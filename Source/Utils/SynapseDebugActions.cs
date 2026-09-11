@@ -330,8 +330,8 @@ namespace RimSynapse.Psychology.Utils
                 rec.warmth = presets[i].w; rec.trust = presets[i].t; rec.familiarity = 60f;
             }
             RimSynapse.SynapseLogger.Info("psychology",
-                $"[RimSynapse] Seeded {System.Math.Min(others.Count, 4)} compass demo relationship(s) for {p.LabelShort} — opening the Psychology window (Profile tab).");
-            Find.WindowStack.Add(new RimSynapse.Psychology.UI.Dialog_PawnPsychology(p));
+                $"[RimSynapse] Seeded {System.Math.Min(others.Count, 4)} compass demo relationship(s) for {p.LabelShort} — opening the Social Network tab.");
+            Find.WindowStack.Add(new RimSynapse.Psychology.UI.Dialog_PawnPsychology(p, openSocial: true));
         }
 
         [DebugAction("RimSynapse", "Skill Engine: Dump personality (LLM + Core baseline)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
