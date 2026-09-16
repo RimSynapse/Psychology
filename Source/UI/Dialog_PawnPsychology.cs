@@ -36,10 +36,13 @@ namespace RimSynapse.Psychology.UI
         
         public override Vector2 InitialSize => new Vector2(650f, 750f);
 
-        public Dialog_PawnPsychology(Pawn pawn)
+        public Dialog_PawnPsychology(Pawn pawn) : this(pawn, false) { }
+
+        public Dialog_PawnPsychology(Pawn pawn, bool openSocial)
         {
             this.pawn = pawn;
             this.coreComp = pawn.TryGetComp<SynapseCorePawnComp>();
+            if (openSocial) this.currentTab = PsychologyTab.SocialNetwork;
             this.forcePause = false;
             this.doCloseX = true;
             this.draggable = true;

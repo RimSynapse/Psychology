@@ -309,6 +309,31 @@ namespace RimSynapse.Psychology.Utils
             Find.WindowStack.Add(new RimSynapse.Psychology.UI.Dialog_PawnPsychology(p));
         }
 
+        /// <summary>#72: seed the clicked pawn's relationships with one colonist in each compass quadrant
+        /// (Friends / Allies / Fond-but-wary / Enemies) and open the Psychology window, so the Relationship
+        /// Compass on the Profile tab can be eyeballed with real content.</summary>
+        [DebugAction("RimSynapse", "Relationships: seed compass demo + open (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void SeedCompassDemo(Pawn p)
+        {
+            if (p?.Map == null) return;
+            var comp = p.GetComp<SynapsePawnComp>();
+            if (comp == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no SynapsePawnComp."); return; }
+            var others = p.Map.mapPawns.FreeColonists.Where(c => c != p).Take(4).ToList();
+            if (others.Count == 0) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse] Need other colonists to plot."); return; }
+
+            var presets = new (float w, float t)[] { (60f, 55f), (-55f, 50f), (55f, -50f), (-60f, -55f) };
+            for (int i = 0; i < others.Count && i < presets.Length; i++)
+            {
+                string id = others[i].GetUniqueLoadID();
+                if (!comp.socialNetwork.ContainsKey(id)) comp.socialNetwork[id] = new RimSynapse.Psychology.Models.SocialRecord();
+                var rec = comp.socialNetwork[id];
+                rec.warmth = presets[i].w; rec.trust = presets[i].t; rec.familiarity = 60f;
+            }
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse] Seeded {System.Math.Min(others.Count, 4)} compass demo relationship(s) for {p.LabelShort} — opening the Social Network tab.");
+            Find.WindowStack.Add(new RimSynapse.Psychology.UI.Dialog_PawnPsychology(p, openSocial: true));
+        }
+
         [DebugAction("RimSynapse", "Skill Engine: Dump personality (LLM + Core baseline)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
         public static void DumpPersonality(Pawn p)
         {
@@ -486,6 +511,260 @@ namespace RimSynapse.Psychology.Utils
                 $"  today: idle {idle:P0}, living-violence {livingViolence:P0} (floor {SynapseSkillAxisMap.BloodlustViolenceFloor:P0})\n" +
                 $"  Bloodlust pressure — thriving+dominant: {thriving:F3}   surviving(no fortune): {survival:F3}   [if fighting @50%: {ifFighting:F3}]\n" +
                 $"  GATE: survival case must be 0.000 — {(survival == 0f ? "PASS" : "FAIL")}; a non-killer (dominance 0) never pushes Bloodlust.");
+        }
+
+        /// <summary>#72 Phase 4: validate the two-axis relationship milestones end-to-end and headlessly. Proves
+        /// (1) a warm+trusted+familiar pair climbs the FRIENDSHIP ladder, firing once per band; (2) an insult-only
+        /// pair — high familiarity but cold warmth — NEVER crosses a friendship band (the old bug) and instead
+        /// crosses the RIVALRY ladder; (3) a former rival that later warms fires the RECONCILIATION path once. No
+        /// args, so it is triggerable via the RimAgentic run_debug_action bridge.</summary>
+        [DebugAction("RimSynapse", "Relationships: Validate two-axis milestones (#72) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateRelationshipMilestones()
+        {
+            var friend = SynapseRelationshipMilestones.FriendshipLadder;
+            var rival = SynapseRelationshipMilestones.RivalryLadder;
+
+            // (1) Warm + trusted + familiar climbs the friendship ladder, one fire per newly-reached band.
+            var a1 = new RimSynapse.Psychology.Models.SocialRecord();
+            var b1 = new RimSynapse.Psychology.Models.SocialRecord();
+            var g0 = friend[0];
+            int f0 = SynapseRelationshipMilestones.AdvanceFriendship(a1, b1, g0.minWarmth + 1f, g0.minTrust + 1f, g0.minFamiliarity + 1f);
+            int f0again = SynapseRelationshipMilestones.AdvanceFriendship(a1, b1, g0.minWarmth + 5f, g0.minTrust + 5f, g0.minFamiliarity + 5f);
+            var gTop = friend[friend.Length - 1];
+            int fTop = SynapseRelationshipMilestones.AdvanceFriendship(a1, b1, gTop.minWarmth + 1f, gTop.minTrust + 1f, gTop.minFamiliarity + 1f);
+            bool friendshipOk = f0 == 0 && f0again == -1 && fTop == friend.Length - 1
+                                && a1.highestFriendshipMilestone == b1.highestFriendshipMilestone;
+
+            // (2) The acceptance bug: two colonists who only ever insult each other are FAMILIAR but cold — they
+            //     must NOT reach any friendship band, and instead register as rivals.
+            float coldWarmth = rival[0].maxWarmth - 5f; // colder than the rivalry gate
+            float highFamiliarity = 90f;
+            int noFriend = SynapseRelationshipMilestones.FriendshipIndexFor(coldWarmth, -20f, highFamiliarity);
+            int isRival = SynapseRelationshipMilestones.RivalryIndexFor(coldWarmth, -20f, highFamiliarity);
+            string coldStatus = SynapseRelationshipMilestones.CurrentStatus(
+                new RimSynapse.Psychology.Models.SocialRecord { warmth = coldWarmth, trust = -20f, familiarity = highFamiliarity });
+            bool insultBugFixed = noFriend == -1 && isRival >= 0 && coldStatus == rival[isRival].label;
+
+            // (3) Reconciliation: a pair that reached a rivalry band, then warms into friendship, fires reconcile once.
+            var a3 = new RimSynapse.Psychology.Models.SocialRecord();
+            var b3 = new RimSynapse.Psychology.Models.SocialRecord();
+            SynapseRelationshipMilestones.AdvanceRivalry(a3, b3, rival[0].maxWarmth - 1f, -10f, rival[0].minFamiliarity + 5f);
+            bool wasRival = a3.highestRivalryMilestone >= 0;
+            // Warm them up and run the notify path (uses the map's first two colonists for the letter, if any).
+            a3.warmth = b3.warmth = g0.minWarmth + 2f;
+            a3.trust = b3.trust = g0.minTrust + 2f;
+            a3.familiarity = b3.familiarity = g0.minFamiliarity + 2f;
+            var cs = Find.CurrentMap?.mapPawns?.FreeColonists;
+            Pawn pa = cs != null && cs.Count > 0 ? cs[0] : null;
+            Pawn pb = cs != null && cs.Count > 1 ? cs[1] : null;
+            if (pa != null && pb != null)
+                SynapseRelationshipMilestones.CheckAndNotify(pa, pb, a3, b3);
+            else // no live pair for the letter — exercise the pure advance + reconcile bookkeeping directly
+            {
+                SynapseRelationshipMilestones.AdvanceFriendship(a3, b3, a3.warmth, a3.trust, a3.familiarity);
+                a3.reconciled = b3.reconciled = true;
+            }
+            bool reconcileOk = wasRival && a3.reconciled && b3.reconciled && a3.highestFriendshipMilestone >= 0;
+
+            bool pass = friendshipOk && insultBugFixed && reconcileOk;
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse #72] Two-axis relationship milestones: {(pass ? "PASS" : "FAIL")}\n" +
+                $"  (1) friendship ladder climbs+single-fire: {friendshipOk} (band0={f0}, re-fire={f0again}, top={fTop}/{friend.Length - 1})\n" +
+                $"  (2) insult-only never friends, is rival: {insultBugFixed} (friendIdx={noFriend}, rivalIdx={isRival}, status='{coldStatus}')\n" +
+                $"  (3) reconciliation once: {reconcileOk} (wasRival={wasRival}, reconciled={a3.reconciled}, friendBand={a3.highestFriendshipMilestone})\n" +
+                (pa != null && pb != null ? "  (letter path exercised on live colonists — check the letter stack)" : "  (no live pair — pure bookkeeping path)"));
+        }
+
+        /// <summary>#72: prove tending grants trust ONCE PER SESSION, not per wound. Injures the clicked pawn with
+        /// several wounds, has the nearest other colonist tend once (TendUtility.DoTend), and confirms trust rose
+        /// by a single session's worth — not multiplied by the wound count.</summary>
+        [DebugAction("RimSynapse", "Relationships: tend builds trust per session (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void TendTrustPerSession(Pawn p)
+        {
+            if (p == null) return;
+            var doctor = p.Map?.mapPawns?.FreeColonists?.FirstOrDefault(c => c != p);
+            if (doctor == null || p.GetComp<SynapsePawnComp>() == null || doctor.GetComp<SynapsePawnComp>() == null)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort}: need a second free colonist and comps on both.");
+                return;
+            }
+
+            // Inflict several fresh wounds so a single tend pass has multiple hediffs to treat.
+            int wounds = 4;
+            for (int i = 0; i < wounds; i++)
+                p.TakeDamage(new DamageInfo(DamageDefOf.Cut, 4f, instigator: doctor));
+
+            string dId = doctor.GetUniqueLoadID();
+            var pComp = p.GetComp<SynapsePawnComp>();
+            pComp.socialNetwork.TryGetValue(dId, out var recBefore);
+            float trustBefore = recBefore?.trust ?? 0f;
+            int tendable = p.health?.hediffSet?.hediffs?.Count(h => h.TendableNow()) ?? 0;
+
+            RimWorld.TendUtility.DoTend(doctor, p, null); // one session — tends all optimal hediffs in one pass
+
+            pComp.socialNetwork.TryGetValue(dId, out var recAfter);
+            float trustAfter = recAfter?.trust ?? 0f;
+            float delta = trustAfter - trustBefore;
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Tend trust: {doctor.LabelShort} tended {p.LabelShort} ---\n" +
+                $"  {wounds} wound(s) inflicted, {tendable} tendable in this pass; trust {trustBefore:F0} -> {trustAfter:F0} (Δ {delta:F0})\n" +
+                $"  PER SESSION: Δ should equal ONE session's award (3), NOT {wounds}× it — {(System.Math.Abs(delta - 3f) < 0.01f ? "PASS" : "CHECK")}.");
+        }
+
+        /// <summary>#72: dump the clicked pawn's compulsion control (emotional brake) and whether their strongest
+        /// negative feeling toward another colonist would ERUPT into an action — plus what a fully volatile vs
+        /// fully controlled pawn would do with that same feeling, to show the gate at work.</summary>
+        [DebugAction("RimSynapse", "Relationships: compulsion control dump (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void CompulsionControlDump(Pawn p)
+        {
+            if (p == null) return;
+            var comp = p.GetComp<SynapsePawnComp>();
+            if (comp == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no SynapsePawnComp."); return; }
+
+            float control = SynapseCompulsion.Effective(p, comp);
+            float baseline = SynapseCompulsion.Baseline(p);
+            string source = comp.compulsionControl >= 0f ? $"LLM-refined {comp.compulsionControl:F2}" : "trait baseline";
+
+            // Strongest dislike: the lowest (most negative) warmth record.
+            Pawn worst = null; float worstWarmth = 0f;
+            foreach (var kv in comp.socialNetwork)
+                if (kv.Value != null && kv.Value.warmth < worstWarmth)
+                {
+                    var t = (p.Map?.mapPawns?.AllPawns ?? System.Linq.Enumerable.Empty<Pawn>())
+                        .FirstOrDefault(x => x.GetUniqueLoadID() == kv.Key);
+                    if (t != null) { worst = t; worstWarmth = kv.Value.warmth; }
+                }
+
+            float magnitude = worst != null ? (-worstWarmth) / 100f : 0f;
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Compulsion control for {p.LabelShort} ---\n" +
+                $"  control = {control:F2} ({source}); baseline from traits = {baseline:F2}   (0 = volatile, 1 = controlled)\n" +
+                (worst == null
+                    ? "  no disliked colonist on record yet — nothing to act on."
+                    : $"  strongest dislike: {worst.LabelShort} (warmth {worstWarmth:F0}, magnitude {magnitude:F2})\n" +
+                      $"  drive to act = {SynapseCompulsion.Drive(magnitude, control):F2} (threshold {SynapseCompulsion.ActThreshold:F2}) → {(SynapseCompulsion.WouldActOn(magnitude, control) ? "ERUPTS" : "suppressed")}\n" +
+                      $"  same feeling if fully VOLATILE(0): {(SynapseCompulsion.WouldActOn(magnitude, 0f) ? "erupts" : "no")}; fully CONTROLLED(1): {(SynapseCompulsion.WouldActOn(magnitude, 1f) ? "erupts" : "no")}"));
+        }
+
+        /// <summary>#72: simulate a shared victory — the clicked pawn "kills a threat" and every drafted colonist
+        /// near them bonds (trust) with them. Temporarily drafts the nearest colonist so there's someone to bond
+        /// with, awards, reports, and restores draft state.</summary>
+        [DebugAction("RimSynapse", "Relationships: shared victory bonds fighters (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void SharedVictoryBond(Pawn p)
+        {
+            if (p?.Map == null) return;
+            var ally = p.Map.mapPawns.FreeColonists.FirstOrDefault(c => c != p && c.drafter != null);
+            if (ally == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort}: need a second draftable colonist."); return; }
+
+            var compP = p.GetComp<SynapsePawnComp>();
+            if (compP == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no SynapsePawnComp."); return; }
+            string idAlly = ally.GetUniqueLoadID();
+            compP.socialNetwork.TryGetValue(idAlly, out var before);
+            float t0 = before?.trust ?? 0f;
+            bool wasDrafted = ally.drafter.Drafted;
+            try
+            {
+                ally.drafter.Drafted = true;
+                int bonded = SynapseRelationships.AwardSharedVictory(p, p.Map, ally.Position, 18f, 2f);
+                float t1 = compP.socialNetwork.TryGetValue(idAlly, out var after) ? after.trust : t0;
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"--- Shared victory for {p.LabelShort} ---\n" +
+                    $"  {bonded} drafted colleague(s) near the kill bonded; {p.LabelShort}↔{ally.LabelShort} trust {t0:F0} -> {t1:F0}.\n" +
+                    "  (Only drafted colonists within 18 tiles of the kill bond — surviving the fight together.)");
+            }
+            finally { ally.drafter.Drafted = wasDrafted; }
+        }
+
+        /// <summary>#72: dump the clicked pawn's personality compatibility with every other colonist — the raw
+        /// score with its clash/kinship reasons, and the warmth pull it would drift this pass (showing how
+        /// familiarity desensitises a liked clash or hypersensitises a resented one).</summary>
+        [DebugAction("RimSynapse", "Relationships: compatibility dump (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void CompatibilityDump(Pawn p)
+        {
+            if (p?.Map == null) return;
+            var comp = p.GetComp<SynapsePawnComp>();
+            var sb = new System.Text.StringBuilder($"--- Compatibility for {p.LabelShort} ---\n");
+            foreach (var other in p.Map.mapPawns.FreeColonists)
+            {
+                if (other == p) continue;
+                var reasons = new System.Collections.Generic.List<string>();
+                float compat = SynapseCompatibility.Score(p, other, reasons);
+                float warmth = 0f, familiarity = 0f;
+                if (comp != null && comp.socialNetwork.TryGetValue(other.GetUniqueLoadID(), out var rec) && rec != null)
+                { warmth = rec.warmth; familiarity = rec.familiarity; }
+                float pull = SynapseCompatibility.EffectivePull(compat, familiarity, warmth);
+                sb.Append($"  {other.LabelShort}: compat {compat:+0.00;-0.00} [{(reasons.Count > 0 ? string.Join(", ", reasons) : "neutral")}]");
+                sb.Append($"  | warmth {warmth:F0}, fam {familiarity:F0} → daily pull {pull:+0.00;-0.00}");
+                if (compat < 0f && familiarity >= 40f)
+                    sb.Append(warmth >= 0f ? "  (desensitised — they overlook it)" : "  (hypersensitised — it grates)");
+                sb.Append("\n");
+            }
+            RimSynapse.SynapseLogger.Info("psychology", sb.ToString());
+        }
+
+        /// <summary>#72: fire the clicked pawn's nightly relationship review now (the LLM reconsiders how they
+        /// feel about the people they know, and the result is applied — bounded, directed, gated). Resets the
+        /// once-a-day guard so it can be re-run.</summary>
+        [DebugAction("RimSynapse", "Relationships: run nightly review (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void RunRelationshipReview(Pawn p)
+        {
+            if (p == null) return;
+            var comp = p.GetComp<SynapsePawnComp>();
+            if (comp != null) comp.lastRelationshipReviewDay = -1;
+            bool queued = SynapsePsychology.QueueRelationshipReview(p);
+            RimSynapse.SynapseLogger.Info("psychology",
+                queued
+                    ? $"[RimSynapse] Relationship review queued for {p.LabelShort} — watch the log for the applied result."
+                    : $"[RimSynapse] {p.LabelShort} has no significant relationships to reconsider yet.");
+        }
+
+        /// <summary>#72: dump the clicked pawn's faith-conversion drift — their LLM susceptibility gate, their
+        /// warmth toward the colony's faithful, the per-day certainty erosion that produces, and roughly how long
+        /// until they'd convert. Ideology-only.</summary>
+        [DebugAction("RimSynapse", "Relationships: conversion drift dump (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ConversionDriftDump(Pawn p)
+        {
+            if (p == null) return;
+            if (!ModsConfig.IdeologyActive) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse] Ideology is not active — conversion drift is inert."); return; }
+            var comp = p.GetComp<SynapsePawnComp>();
+            if (comp == null || p.ideo == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no comp/ideo."); return; }
+
+            var colonyIdeo = Faction.OfPlayerSilentFail?.ideos?.PrimaryIdeo;
+            float warmth01 = colonyIdeo != null ? SynapseConversion.WarmthTowardColonyFaith(p, comp, colonyIdeo) : 0f;
+            float erosion = SynapseConversion.CertaintyErosion(warmth01, comp.conversionSusceptibility);
+            float certainty = p.ideo.Certainty;
+            bool sameFaith = colonyIdeo != null && p.Ideo == colonyIdeo;
+            string eta = erosion > 0f ? $"~{(int)System.Math.Ceiling(certainty / erosion)} days" : "never (no drift)";
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Conversion drift for {p.LabelShort} ---\n" +
+                $"  their faith: {p.Ideo?.name ?? "none"}   colony faith: {colonyIdeo?.name ?? "none"}   {(sameFaith ? "(already the colony faith — inert)" : "")}\n" +
+                $"  susceptibility (LLM gate): {comp.conversionSusceptibility:F2}   warmth toward the faithful: {warmth01:F2}   current certainty: {certainty:F2}\n" +
+                $"  → certainty erosion/day: {erosion:F3}  ({eta} to convert). Both the gate AND a fond tie are needed.");
+        }
+
+        /// <summary>#72: dump the clicked PRISONER's recruitment softening — their warmth toward the colonists,
+        /// whether they share the colony faith (the recruit multiplier), the per-day resistance shaved, and how
+        /// long until they'd join. Closes the befriend→convert→recruit loop.</summary>
+        [DebugAction("RimSynapse", "Relationships: recruitment softening dump (Tool)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void RecruitmentSofteningDump(Pawn p)
+        {
+            if (p == null) return;
+            var comp = p.GetComp<SynapsePawnComp>();
+            if (comp == null) { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} has no SynapsePawnComp."); return; }
+            if (!p.IsPrisonerOfColony || p.guest == null)
+            { RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse] {p.LabelShort} is not a colony prisoner — no resistance to soften."); return; }
+
+            float warmth01 = SynapseRecruitment.WarmthTowardColonists(p, comp);
+            var colonyIdeo = ModsConfig.IdeologyActive ? Faction.OfPlayerSilentFail?.ideos?.PrimaryIdeo : null;
+            bool sharesFaith = colonyIdeo != null && p.Ideo == colonyIdeo;
+            float reduction = SynapseRecruitment.ResistanceReduction(warmth01, sharesFaith);
+            float resistance = p.guest.resistance;
+            string eta = reduction > 0f ? $"~{(int)System.Math.Ceiling(resistance / reduction)} days" : "never (no bond yet)";
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"--- Recruitment softening for {p.LabelShort} ---\n" +
+                $"  resistance: {resistance:F1}   warmth toward colonists: {warmth01:F2}   " +
+                $"shares colony faith: {sharesFaith} ({(sharesFaith ? $"{SynapseRecruitment.ConvertRecruitMultiplier:F0}x" : "1x")})\n" +
+                $"  → resistance shaved/day: {reduction:F2}  ({eta} to willingly join). A bond is required; converting recruits far faster.");
         }
 
         [DebugAction("RimSynapse", "Psychology: Dump voice (Log)", actionType = DebugActionType.ToolMapForPawns, allowedGameStates = AllowedGameStates.PlayingOnMap)]
