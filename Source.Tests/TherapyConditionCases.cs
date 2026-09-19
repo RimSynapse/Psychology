@@ -3,6 +3,8 @@ using System.Linq;
 using RimWorld;
 using Verse;
 using RimSynapse.Psychology.API;
+using RimSynapse.Psychology.Comps;
+using RimSynapse.Psychology.Models;
 using RimAgentic.Testing;
 
 namespace RimSynapse.Psychology.Tests
@@ -59,6 +61,85 @@ namespace RimSynapse.Psychology.Tests
             tier: "Execution", polarity: "negative",
             scenario: "Treatment helpers are called with missing pawns",
             expectation: "No throw; treat returns false and quality returns 0");
+
+            // Pyromania is CHRONIC: therapy manages it to the floor but never cures it (the trait stays).
+            yield return new SynapseTestCase("Psychology_TherapyConditions_ChronicManagedNotCured",
+                () => ChronicManaged(),
+                skipReason: () => HasColonistAnd("Synapse_Hediff_Pyromania"),
+                tier: "Execution", polarity: "negative",
+                scenario: "A pyromaniac is given many high-quality sessions",
+                expectation: "Severity is driven down only to the managed floor and the condition is NOT cured (hediff persists)");
+
+            // Grief is seeded from closeness — a strong warmth bond to the deceased produces real grief.
+            yield return new SynapseTestCase("Psychology_TherapyConditions_GriefSeedsFromWarmth",
+                () => GriefFromWarmth(),
+                skipReason: NeedTwoColonistsAndGrief,
+                tier: "Execution", polarity: "positive",
+                scenario: "A colonist with a strong bond loses that person",
+                expectation: "Grief is seeded at a severity scaled by the bond");
+        }
+
+        private static string HasColonistAnd(string hediffDefName)
+        {
+            var cs = (Find.CurrentMap ?? Find.Maps?.FirstOrDefault())?.mapPawns?.FreeColonists;
+            var def = DefDatabase<HediffDef>.GetNamedSilentFail(hediffDefName);
+            return (cs != null && cs.Count >= 1 && def != null) ? null : $"need a colonist and {hediffDefName}";
+        }
+
+        private static string NeedTwoColonistsAndGrief()
+        {
+            var cs = (Find.CurrentMap ?? Find.Maps?.FirstOrDefault())?.mapPawns?.FreeColonists;
+            var def = DefDatabase<HediffDef>.GetNamedSilentFail("Synapse_Hediff_Grief");
+            return (cs != null && cs.Count >= 2 && def != null) ? null : "need two colonists and the grief hediff def";
+        }
+
+        private static string ChronicManaged()
+        {
+            var cs = (Find.CurrentMap ?? Find.Maps.FirstOrDefault()).mapPawns.FreeColonists.ToList();
+            Pawn patient = cs[0];
+            Pawn therapist = cs.Count > 1 ? cs[1] : cs[0];
+            var def = DefDatabase<HediffDef>.GetNamed("Synapse_Hediff_Pyromania");
+            var h = HediffMaker.MakeHediff(def, patient); h.Severity = 0.8f; patient.health.AddHediff(h);
+            try
+            {
+                for (int i = 0; i < 8 && patient.health.hediffSet.HasHediff(def); i++)
+                    SynapseTherapyConditions.Treat(therapist, patient, h, 1.0f);
+                Assert.True(patient.health.hediffSet.HasHediff(def), "chronic pyromania is never cured — the hediff persists");
+                Assert.True(h.Severity <= 0.11f && h.Severity >= 0.09f, $"severity is held at the managed floor (~0.10, was {h.Severity:0.00})");
+                return $"managed to {h.Severity:0.00}, not cured";
+            }
+            finally
+            {
+                var left = patient.health.hediffSet.GetFirstHediffOfDef(def);
+                while (left != null) { patient.health.RemoveHediff(left); left = patient.health.hediffSet.GetFirstHediffOfDef(def); }
+            }
+        }
+
+        private static string GriefFromWarmth()
+        {
+            var cs = (Find.CurrentMap ?? Find.Maps.FirstOrDefault()).mapPawns.FreeColonists.ToList();
+            Pawn mourner = cs[0], lost = cs[1];
+            var def = DefDatabase<HediffDef>.GetNamed("Synapse_Hediff_Grief");
+            var comp = mourner.GetComp<SynapsePawnComp>();
+            Assert.NotNull(comp, "mourner has a psychology comp");
+            string id = lost.GetUniqueLoadID();
+            float saved = comp.socialNetwork.TryGetValue(id, out var r0) ? r0.warmth : float.NaN;
+            if (!comp.socialNetwork.ContainsKey(id)) comp.socialNetwork[id] = new SocialRecord();
+            comp.socialNetwork[id].warmth = 100f;
+            try
+            {
+                float g = SynapseTherapyConditions.SeedGrief(mourner, lost);
+                Assert.True(g > 0f, "a strong bond seeds grief");
+                Assert.True(mourner.health.hediffSet.HasHediff(def), "the grief hediff is applied");
+                return $"grief seeded at {g:0.00}";
+            }
+            finally
+            {
+                var left = mourner.health.hediffSet.GetFirstHediffOfDef(def);
+                while (left != null) { mourner.health.RemoveHediff(left); left = mourner.health.hediffSet.GetFirstHediffOfDef(def); }
+                if (!float.IsNaN(saved) && comp.socialNetwork.ContainsKey(id)) comp.socialNetwork[id].warmth = saved;
+                else comp.socialNetwork.Remove(id);
+            }
         }
 
         private static string NeedColonistAndTraumaDef()

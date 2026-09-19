@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+  <!-- Passive mood drag while carrying an untreated psychological condition (#17). Situational; the worker
+       (ThoughtWorker_PsychCondition) picks the stage from the pawn's worst condition severity. -->
+  <ThoughtDef>
+    <defName>Synapse_Afflicted</defName>
+    <workerClass>RimSynapse.Psychology.Thoughts.ThoughtWorker_PsychCondition</workerClass>
+    <stages>
+      <li>
+        <label>weighed down</label>
+        <description>There's a weight on my mind I can't set down.</description>
+        <baseMoodEffect>-3</baseMoodEffect>
+      </li>
+      <li>
+        <label>struggling</label>
+        <description>My own mind won't give me any peace.</description>
+        <baseMoodEffect>-6</baseMoodEffect>
+      </li>
+      <li>
+        <label>overwhelmed</label>
+        <description>My mind is a storm I can't find my way out of.</description>
+        <baseMoodEffect>-10</baseMoodEffect>
+      </li>
+    </stages>
+  </ThoughtDef>
+
+</Defs>

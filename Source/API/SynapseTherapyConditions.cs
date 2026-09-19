@@ -16,27 +16,44 @@ namespace RimSynapse.Psychology.API
     /// </summary>
     public static class SynapseTherapyConditions
     {
-        /// <summary>A treatable condition: its hediff, the trait it is seeded from / cured with, and the mental
-        /// state it inflicts while untreated.</summary>
+        /// <summary>A treatable condition: its hediff, the trait it is seeded from, and the mental state it
+        /// inflicts while untreated. Only genuinely SYMPTOMATIC conditions belong here — personality traits
+        /// (greedy, abrasive, jealous, work aversions) are NOT illnesses and are left to the trait engine.</summary>
         public sealed class Condition
         {
             public string hediffDefName;
             public string traitDefName;
             public int[] qualifyingDegrees;   // empty = any degree
             public string chaosStateDefName;  // mental state triggered while untreated
+
+            /// <summary>Curable conditions clear at severity 0 (hediff + trait lift). A CHRONIC condition
+            /// (curable=false, like pyromania / a genetic dependency) is never cured — therapy only holds it at
+            /// or above <see cref="managedFloor"/>, and if <see cref="driftsUntreated"/> the compulsion creeps
+            /// back on its own until treated again.</summary>
+            public bool curable = true;
+            public float managedFloor = 0f;
+            public bool driftsUntreated = false;
         }
 
-        // PTSD → trauma; a negative NaturalMood → depression; weak Nerves → an anxiety disorder. Bloodlust /
-        // Psychopath are identity, not illness, so they are deliberately not modelled here.
+        // Symptomatic mental illnesses only. PTSD → trauma; negative NaturalMood → depression; weak Nerves →
+        // anxiety; Synapse_Bipolar → mood instability; Neurotic → neurosis (all curable). Pyromania is CHRONIC —
+        // managed, never cured, and the urge drifts back untreated.
         public static readonly Condition[] Conditions =
         {
-            new Condition { hediffDefName = "Synapse_Hediff_Trauma",     traitDefName = "Synapse_PTSD", qualifyingDegrees = new int[0],       chaosStateDefName = "Synapse_TraumaTrigger" },
-            new Condition { hediffDefName = "Synapse_Hediff_Depression", traitDefName = "NaturalMood",  qualifyingDegrees = new[] { -1, -2 }, chaosStateDefName = "Wander_Sad" },
-            new Condition { hediffDefName = "Synapse_Hediff_Anxiety",    traitDefName = "Nerves",       qualifyingDegrees = new[] { -1, -2 }, chaosStateDefName = "PanicFlee" },
+            new Condition { hediffDefName = "Synapse_Hediff_Trauma",     traitDefName = "Synapse_PTSD",    qualifyingDegrees = new int[0],       chaosStateDefName = "Synapse_TraumaTrigger" },
+            new Condition { hediffDefName = "Synapse_Hediff_Depression", traitDefName = "NaturalMood",     qualifyingDegrees = new[] { -1, -2 }, chaosStateDefName = "Wander_Sad" },
+            new Condition { hediffDefName = "Synapse_Hediff_Anxiety",    traitDefName = "Nerves",          qualifyingDegrees = new[] { -1, -2 }, chaosStateDefName = "PanicFlee" },
+            new Condition { hediffDefName = "Synapse_Hediff_Bipolar",    traitDefName = "Synapse_Bipolar", qualifyingDegrees = new int[0],       chaosStateDefName = "Synapse_EuphoricReckless" },
+            new Condition { hediffDefName = "Synapse_Hediff_Neurotic",   traitDefName = "Neurotic",        qualifyingDegrees = new int[0],       chaosStateDefName = "Wander_Sad" },
+            new Condition { hediffDefName = "Synapse_Hediff_Pyromania",  traitDefName = "Pyromaniac",      qualifyingDegrees = new int[0],       chaosStateDefName = "FireStartingSpree",
+                            curable = false, managedFloor = 0.1f, driftsUntreated = true },
+            // Event-driven, no trait: seeded by SeedGrief on a death, fades on its own via the hediff comp.
+            new Condition { hediffDefName = "Synapse_Hediff_Grief",      traitDefName = "",                qualifyingDegrees = new int[0],       chaosStateDefName = "Wander_Sad" },
         };
 
-        private const float TreatPower = 0.25f;   // best-case severity removed by one ideal session
-        private const float WorsenPerLowMoodTick = 0.02f;
+        private const float TreatPower = 0.25f;            // best-case severity removed by one ideal session
+        private const float WorsenPerLowMoodTick = 0.02f;  // symptomatic illnesses fester while the pawn is miserable
+        private const float ChronicDriftPerTick = 0.006f;  // a chronic compulsion creeps back untreated (~0.14/day)
 
         public static HediffDef HediffOf(Condition c) => DefDatabase<HediffDef>.GetNamedSilentFail(c.hediffDefName);
 
@@ -52,13 +69,16 @@ namespace RimSynapse.Psychology.API
             return trait;
         }
 
-        /// <summary>Severity a freshly-seeded condition starts at, from how deep the seeding trait runs.</summary>
+        /// <summary>Severity a freshly-seeded condition starts at, from how deep the seeding trait runs. Keys on
+        /// the trait's MAGNITUDE so it works for negative degrees (NaturalMood/Nerves) and positive ones
+        /// (Neurotic) alike.</summary>
         public static float SeedSeverity(Trait trait)
         {
             if (trait == null) return 0.7f;
-            if (trait.Degree <= -2) return 0.85f;
-            if (trait.Degree == -1) return 0.55f;
-            return 0.9f; // PTSD and other single-degree conditions run deep
+            int m = Mathf.Abs(trait.Degree);
+            if (m >= 2) return 0.85f;
+            if (m == 1) return 0.55f;
+            return 0.9f; // single-degree conditions (PTSD, Bipolar, Pyromania) run deep
         }
 
         /// <summary>Give the pawn any condition hediff its psyche warrants but that it doesn't yet carry. The
@@ -159,16 +179,20 @@ namespace RimSynapse.Psychology.API
         public static bool Treat(Pawn therapist, Pawn patient, Hediff target, float quality)
         {
             if (patient == null || target == null) return false;
+            var condition = ConditionForHediff(target);
 
             float delta = quality >= 0.2f
                 ? -quality * TreatPower                     // helped: remove up to TreatPower severity
                 : (0.2f - quality) * 0.10f;                 // botched: a small setback
 
+            // A chronic condition can only be MANAGED down to its floor, never cleared.
+            float floor = condition?.managedFloor ?? 0f;
             float before = target.Severity;
-            target.Severity = Mathf.Max(0f, before + delta);
+            target.Severity = Mathf.Max(floor, before + delta);
             bool helped = target.Severity < before - 0.0001f;
 
-            if (target.Severity <= 0.001f)
+            // Only a curable condition resolves at zero; a chronic one stays (held at its floor).
+            if ((condition == null || condition.curable) && target.Severity <= 0.001f)
                 Cure(patient, target, therapist);
 
             return helped;
@@ -241,15 +265,63 @@ namespace RimSynapse.Psychology.API
             return pawn.mindState.mentalStateHandler.TryStartMentalState(stateDef, "untreated psychological condition", forced: true);
         }
 
-        /// <summary>Progression: an untreated condition festers while the pawn is miserable. Called on the pawn's
-        /// rare tick when mood is very low — nudges the worst condition's severity up (bounded), so neglect makes
-        /// therapy longer, and a cared-for colony's conditions at least hold steady.</summary>
-        public static void WorsenIfNeglected(Pawn pawn)
+        /// <summary>Progression, called each rare tick. Two kinds: a CHRONIC compulsion (pyromania) creeps back up
+        /// on its own until treated again — this is the "without treatment they go burn stuff" pressure. A
+        /// symptomatic illness only festers while the pawn is miserable (very low mood), so a cared-for colony's
+        /// conditions at least hold steady. Bounded to [floor, 1].</summary>
+        public static void TickProgression(Pawn pawn)
         {
-            if (pawn?.needs?.mood == null) return;
-            if (pawn.needs.mood.CurLevelPercentage >= 0.15f) return;
-            var worst = MostSevere(pawn);
-            if (worst != null) worst.Severity = Mathf.Min(1f, worst.Severity + WorsenPerLowMoodTick);
+            if (pawn?.health?.hediffSet == null || pawn.Dead) return;
+            bool miserable = (pawn.needs?.mood?.CurLevelPercentage ?? 1f) < 0.15f;
+
+            foreach (var c in Conditions)
+            {
+                if (string.IsNullOrEmpty(c.traitDefName)) continue; // event-driven (grief) — its comp handles decline
+                var def = HediffOf(c);
+                var h = def != null ? pawn.health.hediffSet.GetFirstHediffOfDef(def) : null;
+                if (h == null) continue;
+
+                if (c.driftsUntreated)
+                    h.Severity = Mathf.Min(1f, h.Severity + ChronicDriftPerTick);
+                else if (miserable)
+                    h.Severity = Mathf.Min(1f, h.Severity + WorsenPerLowMoodTick);
+            }
+        }
+
+        /// <summary>Event onset for grief: when someone dies, a mourner's grief is seeded from how close they were —
+        /// blood/love relations run deepest, then the warmth they held on the #72 compass. Returns the severity set
+        /// (0 if not close enough to grieve). Stacks toward the worse of an existing grief and this loss.</summary>
+        public static float SeedGrief(Pawn mourner, Pawn deceased)
+        {
+            if (mourner?.health?.hediffSet == null || deceased == null || mourner == deceased || mourner.Dead) return 0f;
+            var def = DefDatabase<HediffDef>.GetNamedSilentFail("Synapse_Hediff_Grief");
+            if (def == null) return 0f;
+
+            float closeness = 0f;
+            if (mourner.relations != null)
+            {
+                foreach (var rel in mourner.relations.DirectRelations)
+                {
+                    if (rel.otherPawn != deceased) continue;
+                    string d = rel.def.defName;
+                    if (d == "Spouse" || d == "Lover" || d == "Fiance") closeness = Mathf.Max(closeness, 0.9f);
+                    else if (d == "Parent" || d == "Child" || d == "Sibling") closeness = Mathf.Max(closeness, 0.75f);
+                    else closeness = Mathf.Max(closeness, 0.5f);
+                }
+            }
+            var comp = mourner.GetComp<SynapsePawnComp>();
+            if (comp?.socialNetwork != null && comp.socialNetwork.TryGetValue(deceased.GetUniqueLoadID(), out var rec))
+                closeness = Mathf.Max(closeness, Mathf.Clamp01(rec.warmth / 100f) * 0.7f);
+
+            if (closeness < 0.25f) return 0f; // not close enough to truly grieve
+
+            var existing = mourner.health.hediffSet.GetFirstHediffOfDef(def);
+            if (existing != null) { existing.Severity = Mathf.Max(existing.Severity, closeness); return existing.Severity; }
+
+            var h = HediffMaker.MakeHediff(def, mourner);
+            h.Severity = closeness;
+            mourner.health.AddHediff(h);
+            return closeness;
         }
     }
 }

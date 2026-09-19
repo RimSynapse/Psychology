@@ -1227,6 +1227,72 @@ namespace RimSynapse.Psychology.Utils
                 while (leftover != null) { patient.health.RemoveHediff(leftover); leftover = patient.health.hediffSet.GetFirstHediffOfDef(traumaDef); }
             }
         }
+
+        /// <summary>#17: validate the CHRONIC pyromania model (managed to a floor, never cured, drifts back
+        /// untreated) and event-driven GRIEF seeding + treatment. No args; cleans up.</summary>
+        [DebugAction("RimSynapse", "Therapy: Validate chronic + grief conditions (#17) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateChronicAndGrief()
+        {
+            var cs = Find.CurrentMap?.mapPawns?.FreeColonists;
+            if (cs == null || cs.Count < 2)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse #17] Need >=2 free colonists (have {cs?.Count ?? 0}).");
+                return;
+            }
+            Pawn therapist = cs[0], patient = cs[1];
+            var pyroDef = DefDatabase<HediffDef>.GetNamedSilentFail("Synapse_Hediff_Pyromania");
+            var griefDef = DefDatabase<HediffDef>.GetNamedSilentFail("Synapse_Hediff_Grief");
+            if (pyroDef == null || griefDef == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse #17] condition hediff defs missing."); return; }
+
+            float savedWarmth = float.NaN; string tId = therapist.GetUniqueLoadID();
+            var pc = patient.GetComp<SynapsePawnComp>();
+            try
+            {
+                // (1) Chronic pyromania: treat it down to the managed floor but NEVER cured / trait never lifts.
+                var h = HediffMaker.MakeHediff(pyroDef, patient); h.Severity = 0.8f; patient.health.AddHediff(h);
+                for (int i = 0; i < 8 && patient.health.hediffSet.HasHediff(pyroDef); i++)
+                    SynapseTherapyConditions.Treat(therapist, patient, h, 1.0f);
+                bool stillPresent = patient.health.hediffSet.HasHediff(pyroDef);
+                float floored = stillPresent ? h.Severity : -1f;
+                bool managedOk = stillPresent && floored <= 0.11f && floored >= 0.09f;
+
+                // (2) Chronic drift: untreated, the urge creeps back up.
+                float beforeDrift = h.Severity;
+                for (int i = 0; i < 5; i++) SynapseTherapyConditions.TickProgression(patient);
+                bool driftOk = h.Severity > beforeDrift;
+                if (patient.health.hediffSet.HasHediff(pyroDef)) patient.health.RemoveHediff(h);
+
+                // (3) Grief seeds from closeness (force it via compass warmth) and is curable.
+                if (pc?.socialNetwork != null)
+                {
+                    if (!pc.socialNetwork.ContainsKey(tId)) pc.socialNetwork[tId] = new RimSynapse.Psychology.Models.SocialRecord();
+                    savedWarmth = pc.socialNetwork[tId].warmth;
+                    pc.socialNetwork[tId].warmth = 100f;
+                }
+                float g = SynapseTherapyConditions.SeedGrief(patient, therapist);
+                bool griefSeeded = g > 0f && patient.health.hediffSet.HasHediff(griefDef);
+                var gh = patient.health.hediffSet.GetFirstHediffOfDef(griefDef);
+                if (gh != null) { float gb = gh.Severity; SynapseTherapyConditions.Treat(therapist, patient, gh, 1.0f); }
+                bool griefTreatable = gh == null || !patient.health.hediffSet.HasHediff(griefDef) || gh.Severity < g;
+
+                bool pass = managedOk && driftOk && griefSeeded && griefTreatable;
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"[RimSynapse #17] Chronic + grief: {(pass ? "PASS" : "FAIL")}\n" +
+                    $"  (1) pyromania managed not cured: {managedOk} (floored at {floored:0.00}, hediff present: {stillPresent})\n" +
+                    $"  (2) untreated drifts back up: {driftOk} ({beforeDrift:0.00} -> {h.Severity:0.00})\n" +
+                    $"  (3) grief seeded from closeness: {griefSeeded} (severity {g:0.00}); treatable: {griefTreatable}");
+            }
+            finally
+            {
+                foreach (var def in new[] { pyroDef, griefDef })
+                {
+                    var left = patient.health.hediffSet?.GetFirstHediffOfDef(def);
+                    while (left != null) { patient.health.RemoveHediff(left); left = patient.health.hediffSet.GetFirstHediffOfDef(def); }
+                }
+                if (pc?.socialNetwork != null && !float.IsNaN(savedWarmth) && pc.socialNetwork.ContainsKey(tId))
+                    pc.socialNetwork[tId].warmth = savedWarmth;
+            }
+        }
     }
 }
 

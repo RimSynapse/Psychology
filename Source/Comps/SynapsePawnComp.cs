@@ -298,7 +298,7 @@ namespace RimSynapse.Psychology.Comps
                     if (pawn.IsColonist || pawn.IsPrisonerOfColony || pawn.IsSlaveOfColony)
                     {
                         RimSynapse.Psychology.API.SynapseTherapyConditions.EnsureSeeded(pawn);
-                        RimSynapse.Psychology.API.SynapseTherapyConditions.WorsenIfNeglected(pawn);
+                        RimSynapse.Psychology.API.SynapseTherapyConditions.TickProgression(pawn);
                         RimSynapse.Psychology.API.SynapseTherapyConditions.TickChaos(pawn, 2500);
                     }
                 }
