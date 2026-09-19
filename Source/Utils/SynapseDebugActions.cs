@@ -1111,6 +1111,51 @@ namespace RimSynapse.Psychology.Utils
                 $"  {witness.LabelShort}: {iWit} [expect Witness]\n" +
                 (stranger != null ? $"  {stranger.LabelShort}: {iStr} [expect None]\n" : "  (no 4th colonist to check the None tier)\n"));
         }
+
+        /// <summary>#17: validate the therapy-session completion backbone — a successful session records a
+        /// Therapy-tagged memory AND a transcript on BOTH participants (the same path every session mode runs
+        /// on completion). Uses the map's first two free colonists; no args, so it is triggerable via the
+        /// RimAgentic run_debug_action bridge.</summary>
+        [DebugAction("RimSynapse", "Therapy: Validate session records both pawns (#17) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateTherapySessionRecord()
+        {
+            var cs = Find.CurrentMap?.mapPawns?.FreeColonists;
+            if (cs == null || cs.Count < 2)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse #17] Need >=2 free colonists (have {cs?.Count ?? 0}).");
+                return;
+            }
+            Pawn therapist = cs[0], patient = cs[1];
+
+            int TherapyMems(Pawn p)
+            {
+                var core = p.TryGetComp<SynapseCorePawnComp>();
+                if (core?.memories == null) return 0;
+                int n = 0;
+                foreach (var m in core.memories)
+                    if (m.memoryType == "Therapy") n++;
+                return n;
+            }
+            int TranscriptCount(Pawn p) => p.TryGetComp<SynapsePawnComp>()?.therapyTranscripts?.Count ?? 0;
+
+            int tBefore = TherapyMems(therapist), pBefore = TherapyMems(patient);
+            int tScriptBefore = TranscriptCount(therapist), pScriptBefore = TranscriptCount(patient);
+
+            RimSynapse.Psychology.API.SynapseTherapy.RecordSession(therapist, patient, success: true);
+
+            int tAfter = TherapyMems(therapist), pAfter = TherapyMems(patient);
+            int tScriptAfter = TranscriptCount(therapist), pScriptAfter = TranscriptCount(patient);
+
+            bool bothMem = tAfter == tBefore + 1 && pAfter == pBefore + 1;
+            bool bothScript = tScriptAfter == tScriptBefore + 1 && pScriptAfter == pScriptBefore + 1;
+            bool pass = bothMem && bothScript;
+
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse #17] Therapy session record: {(pass ? "PASS" : "FAIL")}\n" +
+                $"  {therapist.LabelShort} (therapist): Therapy memories {tBefore}->{tAfter}, transcripts {tScriptBefore}->{tScriptAfter}\n" +
+                $"  {patient.LabelShort} (patient):   Therapy memories {pBefore}->{pAfter}, transcripts {pScriptBefore}->{pScriptAfter}\n" +
+                $"  both gained a memory: {bothMem}; both gained a transcript: {bothScript}");
+        }
     }
 }
 

@@ -6,24 +6,42 @@ using RimSynapse.Psychology.Comps;
 
 namespace RimSynapse.Psychology.Jobs
 {
+    /// <summary>How a therapy session plays out (#17). Passed in via <see cref="Verse.AI.Job.count"/> when the
+    /// session is ordered, then read once at session start. Watch/Guiding open the live dialogue window;
+    /// Background runs the whole thing headless. All three converge on the same mechanical outcome and both
+    /// participants record a Therapy memory + transcript.</summary>
+    public enum TherapyMode { Background = 0, Watch = 1, GuidingHand = 2 }
+
     public class JobDriver_TherapySession : JobDriver
     {
         private Pawn TargetPawn => (Pawn)job.GetTarget(TargetIndex.A).Thing;
         private Thing SeatA => job.GetTarget(TargetIndex.B).Thing;
         private Thing SeatB => job.GetTarget(TargetIndex.C).Thing;
 
+        // #17: the chosen auto-mode. Ordered sessions stash it in job.count; read once at chat start.
+        public TherapyMode sessionMode = TherapyMode.Background;
         public bool backgroundResolution = false;
         private List<string> backgroundChatLog = null;
+        private UI.Dialog_TherapySession openDialog = null;
+        private bool outcomeResolved = false;
 
+        /// <summary>The player pushed a live session to the background: drop the window, let the job finish
+        /// headless. The transcript so far is carried into the completion memory.</summary>
         public void EnableBackgroundResolution(List<string> chatLog)
         {
             backgroundResolution = true;
+            sessionMode = TherapyMode.Background;
             backgroundChatLog = chatLog;
+            openDialog = null;
         }
 
         public void EndJobManually(List<string> chatLog)
         {
-            pawn.jobs.EndCurrentJob(JobCondition.Succeeded);
+            // Manual window-close finishes the session (its finish action resolves the outcome). Guard against
+            // re-entry: once the outcome has resolved, closing the window must not try to end the job again.
+            if (outcomeResolved) return;
+            if (pawn?.jobs?.curDriver == this)
+                pawn.jobs.EndCurrentJob(JobCondition.Succeeded);
         }
 
         public override bool TryMakePreToilReservations(bool errorOnFailed)
@@ -71,6 +89,15 @@ namespace RimSynapse.Psychology.Jobs
             Toil chatToil = new Toil();
             chatToil.initAction = delegate
             {
+                // #17: mode was stashed in job.count by whoever ordered the session (float menu / debug).
+                // Background stays headless; Watch/Guiding open the live dialogue window on the therapist.
+                sessionMode = (TherapyMode)job.count;
+                if (sessionMode != TherapyMode.Background && pawn.IsColonistPlayerControlled && Find.WindowStack != null)
+                {
+                    openDialog = new UI.Dialog_TherapySession(pawn, TargetPawn, this, sessionMode == TherapyMode.GuidingHand);
+                    Find.WindowStack.Add(openDialog);
+                }
+
                 Job waitJob = null;
                 if (SeatB != null && SeatB.def != null && SeatB.def.building != null && SeatB.def.building.isSittable)
                 {
@@ -113,6 +140,17 @@ namespace RimSynapse.Psychology.Jobs
 
         private void CalculateTherapyOutcome()
         {
+            // Fires once per session — the toil finish action and a manual window-close can both land here.
+            if (outcomeResolved) return;
+            outcomeResolved = true;
+
+            // A live window (Watch/Guiding) showing a session that has now concluded should close.
+            if (openDialog != null)
+            {
+                try { openDialog.Close(false); } catch { }
+                openDialog = null;
+            }
+
             if (TargetPawn.Dead || pawn.Dead) return;
 
             float baseChance = 0.30f; // 30% Base
@@ -223,6 +261,11 @@ namespace RimSynapse.Psychology.Jobs
                 }
                 MoteMaker.ThrowText(TargetPawn.DrawPos, TargetPawn.Map, "Therapy Failed", 4f);
             }
+
+            // #17: every completed session — Guiding Hand, Watch, or Background — is remembered by BOTH
+            // participants (a Therapy-tagged memory + transcript). Deterministic backbone; the LLM dialogue,
+            // when there was one, only supplies the transcript lines.
+            API.SynapseTherapy.RecordSession(pawn, TargetPawn, success, backgroundChatLog);
         }
 
         private bool IsCurablePsychologicalTrait(Pawn pawn, Trait t)
