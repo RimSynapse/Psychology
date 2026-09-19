@@ -6,24 +6,40 @@ using RimSynapse.Psychology.Comps;
 
 namespace RimSynapse.Psychology.Jobs
 {
+    /// <summary>How a therapy session plays out (#17). Passed in via <see cref="Verse.AI.Job.count"/> when the
+    /// session is ordered, then read once at session start. Watch/Guiding open the live dialogue window;
+    /// Background runs the whole thing headless. All three converge on the same mechanical outcome and both
+    /// participants record a Therapy memory + transcript.</summary>
+    public enum TherapyMode { Background = 0, Watch = 1, GuidingHand = 2 }
+
     public class JobDriver_TherapySession : JobDriver
     {
         private Pawn TargetPawn => (Pawn)job.GetTarget(TargetIndex.A).Thing;
-        private Thing SeatA => job.GetTarget(TargetIndex.B).Thing;
-        private Thing SeatB => job.GetTarget(TargetIndex.C).Thing;
 
+        // #17: the chosen auto-mode. Ordered sessions stash it in job.count; read once at chat start.
+        public TherapyMode sessionMode = TherapyMode.Background;
         public bool backgroundResolution = false;
         private List<string> backgroundChatLog = null;
+        private UI.Dialog_TherapySession openDialog = null;
+        private bool outcomeResolved = false;
 
+        /// <summary>The player pushed a live session to the background: drop the window, let the job finish
+        /// headless. The transcript so far is carried into the completion memory.</summary>
         public void EnableBackgroundResolution(List<string> chatLog)
         {
             backgroundResolution = true;
+            sessionMode = TherapyMode.Background;
             backgroundChatLog = chatLog;
+            openDialog = null;
         }
 
         public void EndJobManually(List<string> chatLog)
         {
-            pawn.jobs.EndCurrentJob(JobCondition.Succeeded);
+            // Manual window-close finishes the session (its finish action resolves the outcome). Guard against
+            // re-entry: once the outcome has resolved, closing the window must not try to end the job again.
+            if (outcomeResolved) return;
+            if (pawn?.jobs?.curDriver == this)
+                pawn.jobs.EndCurrentJob(JobCondition.Succeeded);
         }
 
         public override bool TryMakePreToilReservations(bool errorOnFailed)
@@ -37,65 +53,54 @@ namespace RimSynapse.Psychology.Jobs
             this.FailOnDowned(TargetIndex.A);
             this.FailOnNotAwake(TargetIndex.A);
 
-            // Find seating for both
+            // #17 redesign: therapy is held in the PATIENT'S OWN BEDROOM (not a medical bed). Meet at a cell
+            // beside their bed and send them home to wait there; the bedroom is where the privacy bonus lives.
             yield return new Toil
             {
                 initAction = delegate
                 {
-                    Thing seat1 = GenClosest.ClosestThingReachable(TargetPawn.Position, pawn.Map, ThingRequest.ForGroup(ThingRequestGroup.BuildingArtificial), PathEndMode.OnCell, TraverseParms.For(pawn), 20f, 
-                        t => t.def.building != null && t.def.building.isSittable && (t as RimWorld.Building_Bed) == null && pawn.CanReserve(t) && TargetPawn.CanReserve(t));
-                    
-                    Thing seat2 = null;
-                    if (seat1 != null)
+                    IntVec3 meet = TargetPawn.Position;
+                    Building_Bed bed = TargetPawn.ownership?.OwnedBed;
+                    if (bed != null && bed.Spawned)
                     {
-                        seat2 = GenClosest.ClosestThingReachable(seat1.Position, pawn.Map, ThingRequest.ForGroup(ThingRequestGroup.BuildingArtificial), PathEndMode.OnCell, TraverseParms.For(pawn), 4f, 
-                            t => t != seat1 && t.def.building != null && t.def.building.isSittable && (t as RimWorld.Building_Bed) == null && pawn.CanReserve(t) && TargetPawn.CanReserve(t));
+                        foreach (IntVec3 c in GenAdj.CellsAdjacent8Way(bed))
+                        {
+                            if (c.InBounds(pawn.Map) && c.Standable(pawn.Map)
+                                && pawn.CanReserveAndReach(c, PathEndMode.OnCell, Danger.Deadly))
+                            { meet = c; break; }
+                        }
+                        Job goHome = JobMaker.MakeJob(JobDefOf.Goto, bed.Position);
+                        TargetPawn.jobs.StartJob(goHome, JobCondition.InterruptForced);
                     }
-
-                    if (seat1 != null && seat2 != null)
-                    {
-                        job.SetTarget(TargetIndex.B, seat1);
-                        job.SetTarget(TargetIndex.C, seat2);
-                    }
-                    else
-                    {
-                        job.SetTarget(TargetIndex.B, pawn.Position);
-                        job.SetTarget(TargetIndex.C, TargetPawn.Position);
-                    }
+                    job.SetTarget(TargetIndex.B, meet);
                 }
             };
 
-            // Path to seating
-            yield return Toils_Goto.GotoThing(TargetIndex.A, PathEndMode.Touch);
+            // Therapist walks to the bedside meeting cell.
+            yield return Toils_Goto.GotoCell(TargetIndex.B, PathEndMode.OnCell);
 
             Toil chatToil = new Toil();
             chatToil.initAction = delegate
             {
-                Job waitJob = null;
-                if (SeatB != null && SeatB.def != null && SeatB.def.building != null && SeatB.def.building.isSittable)
+                // #17: mode was stashed in job.count by whoever ordered the session (float menu / debug).
+                // Background stays headless; Watch/Guiding open the live dialogue window on the therapist.
+                sessionMode = (TherapyMode)job.count;
+                if (sessionMode != TherapyMode.Background && pawn.IsColonistPlayerControlled && Find.WindowStack != null)
                 {
-                    waitJob = JobMaker.MakeJob(JobDefOf.Wait_Combat, 4000); 
-                    TargetPawn.jobs.StartJob(waitJob, JobCondition.InterruptForced);
-                    
-                    pawn.pather.StartPath(SeatA, PathEndMode.OnCell);
+                    openDialog = new UI.Dialog_TherapySession(pawn, TargetPawn, this, sessionMode == TherapyMode.GuidingHand);
+                    Find.WindowStack.Add(openDialog);
                 }
-                else
-                {
-                    waitJob = JobMaker.MakeJob(JobDefOf.Wait_Combat, 4000);
-                    TargetPawn.jobs.StartJob(waitJob, JobCondition.InterruptForced);
-                    pawn.rotationTracker.FaceCell(TargetPawn.Position);
-                    TargetPawn.rotationTracker.FaceCell(pawn.Position);
-                }
+
+                Job waitJob = JobMaker.MakeJob(JobDefOf.Wait_Combat, 4000);
+                TargetPawn.jobs.StartJob(waitJob, JobCondition.InterruptForced);
+                pawn.rotationTracker.FaceCell(TargetPawn.Position);
+                TargetPawn.rotationTracker.FaceCell(pawn.Position);
             };
-            
+
             chatToil.tickAction = delegate
             {
-                if (SeatA == null || SeatA.def == null || !SeatA.def.building.isSittable)
-                {
-                    pawn.rotationTracker.FaceCell(TargetPawn.Position);
-                    TargetPawn.rotationTracker.FaceCell(pawn.Position);
-                }
-                
+                pawn.rotationTracker.FaceCell(TargetPawn.Position);
+                TargetPawn.rotationTracker.FaceCell(pawn.Position);
                 pawn.needs?.joy?.GainJoy(0.0001f, JoyKindDefOf.Social);
                 TargetPawn.needs?.joy?.GainJoy(0.0001f, JoyKindDefOf.Social);
             };
@@ -113,153 +118,60 @@ namespace RimSynapse.Psychology.Jobs
 
         private void CalculateTherapyOutcome()
         {
+            // Fires once per session — the toil finish action and a manual window-close can both land here.
+            if (outcomeResolved) return;
+            outcomeResolved = true;
+
+            // A live window (Watch/Guiding) showing a session that has now concluded should close.
+            if (openDialog != null)
+            {
+                try { openDialog.Close(false); } catch { }
+                openDialog = null;
+            }
+
             if (TargetPawn.Dead || pawn.Dead) return;
 
-            float baseChance = 0.30f; // 30% Base
-            
-            // Therapist Skill
-            int socialSkill = pawn.skills != null ? pawn.skills.GetSkill(SkillDefOf.Social).Level : 0;
-            float skillFactor = socialSkill * 0.03f;
-            
-            // Privacy Bonus
-            float privacyBonus = 0f;
-            var room = pawn.GetRoom();
-            if (room != null)
+            // #17 redesign: therapy is treatment, not a coin flip. Compute a WEIGHTED quality (skill, the
+            // bedroom's privacy, trust, the patient's receptiveness) and apply it to the patient's worst
+            // untreated condition. Reaching zero severity cures it (hediff + seeding trait lift). With no
+            // condition present, it's a general supportive session whose only effect is the mood thought.
+            Room room = TargetPawn.GetRoom() ?? pawn.GetRoom();
+            float quality = API.SynapseTherapyConditions.Quality(pawn, TargetPawn, room);
+            var target = API.SynapseTherapyConditions.MostSevere(TargetPawn);
+
+            bool helped = target != null
+                ? API.SynapseTherapyConditions.Treat(pawn, TargetPawn, target, quality)
+                : quality >= 0.4f;
+
+            // Immediate mood feedback scaled by how the session went.
+            if (TargetPawn.needs?.mood != null)
             {
-                bool isPatientRoom = TargetPawn.ownership != null && TargetPawn.ownership.OwnedRoom == room;
-                bool isSecure = room.Role != RoomRoleDefOf.None && room.RegionCount > 0;
-                
-                int pawnCount = 0;
-                foreach (Thing t in room.ContainedAndAdjacentThings)
+                if (quality >= 0.35f)
                 {
-                    if (t is Pawn p && p.RaceProps.Humanlike && p.Awake())
-                        pawnCount++;
-                }
-                
-                if (isPatientRoom || (isSecure && pawnCount == 2))
-                {
-                    privacyBonus = 0.20f; // 20% bonus for privacy
-                }
-            }
-
-            // Trust Factor
-            float trustBonus = 0f;
-            var tComp = TargetPawn.GetComp<SynapsePawnComp>();
-            if (tComp != null && tComp.socialNetwork != null)
-            {
-                string pId = pawn.GetUniqueLoadID();
-                if (tComp.socialNetwork.ContainsKey(pId))
-                {
-                    float trust = tComp.socialNetwork[pId].trust; // -100 to 100
-                    trustBonus = (trust / 100f) * 0.15f; // Up to +15% or -15%
-                }
-            }
-
-            float successChance = baseChance + skillFactor + privacyBonus + trustBonus;
-            
-            bool success = Rand.Chance(successChance);
-            float moodPct = TargetPawn.needs != null && TargetPawn.needs.mood != null ? TargetPawn.needs.mood.CurLevelPercentage : 0.5f;
-
-            if (success)
-            {
-                // Apply successful thought with inverse mood scaling
-                var successDef = DefDatabase<ThoughtDef>.GetNamedSilentFail("Synapse_SuccessfulTherapy");
-                if (successDef != null && TargetPawn.needs != null && TargetPawn.needs.mood != null)
-                {
-                    var memory = (Thought_Memory)ThoughtMaker.MakeThought(successDef);
-                    // If miserable (0%), power factor = 2.0. If happy (100%), power factor = ~0.0.
-                    memory.moodPowerFactor = (1.0f - moodPct) * 2f; 
-                    TargetPawn.needs.mood.thoughts.memories.TryGainMemory(memory);
-                }
-
-                MoteMaker.ThrowText(TargetPawn.DrawPos, TargetPawn.Map, "Therapy Successful", 4f);
-                
-                // Attempt to cure a trait
-                float cureChance = 0.10f * moodPct; // Happier = higher cure chance
-                if (Rand.Chance(cureChance) && TargetPawn.story != null && TargetPawn.story.traits != null)
-                {
-                    List<Trait> curableTraits = new List<Trait>();
-                    foreach (Trait t in TargetPawn.story.traits.allTraits)
+                    var successDef = DefDatabase<ThoughtDef>.GetNamedSilentFail("Synapse_SuccessfulTherapy");
+                    if (successDef != null)
                     {
-                        if (IsCurablePsychologicalTrait(TargetPawn, t))
-                        {
-                            curableTraits.Add(t);
-                        }
-                    }
-
-                    if (curableTraits.Count > 0)
-                    {
-                        Trait curedTrait = curableTraits.RandomElement();
-                        TargetPawn.story.traits.allTraits.Remove(curedTrait);
-                        Messages.Message($"{TargetPawn.NameShortColored} was cured of {curedTrait.Label} thanks to successful therapy from {pawn.NameShortColored}!", TargetPawn, MessageTypeDefOf.PositiveEvent);
-                        
-                        // Inject into Trait History Timeline
-                        var coreComp = TargetPawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
-                        if (coreComp != null)
-                        {
-                            long currentTick = Find.TickManager?.TicksAbs ?? 0;
-                            coreComp.AddMemory(new RimSynapse.Models.WeightedMemory
-                            {
-                                summary = $"Cured of {curedTrait.Label} through successful therapy.",
-                                weight = 1.0f,
-                                baseWeight = 1.0f,
-                                decayRate = 0f,
-                                isLongTerm = true, // Timeline memories never decay
-                                tags = new List<string> { "TraitShift", "Therapy", "Recovery" },
-                                memoryType = "TraitLost",
-                                absTick = currentTick,
-                                gameTick = Find.TickManager?.TicksGame ?? 0
-                            });
-                        }
+                        var memory = (Thought_Memory)ThoughtMaker.MakeThought(successDef);
+                        memory.moodPowerFactor = 0.5f + quality; // a better session lands harder
+                        TargetPawn.needs.mood.thoughts.memories.TryGainMemory(memory);
                     }
                 }
-            }
-            else
-            {
-                var failDef = DefDatabase<ThoughtDef>.GetNamedSilentFail("Synapse_AwkwardTherapy");
-                if (failDef != null && TargetPawn.needs != null && TargetPawn.needs.mood != null)
+                else
                 {
-                    TargetPawn.needs.mood.thoughts.memories.TryGainMemory(failDef);
+                    var failDef = DefDatabase<ThoughtDef>.GetNamedSilentFail("Synapse_AwkwardTherapy");
+                    if (failDef != null) TargetPawn.needs.mood.thoughts.memories.TryGainMemory(failDef);
                 }
-                MoteMaker.ThrowText(TargetPawn.DrawPos, TargetPawn.Map, "Therapy Failed", 4f);
             }
-        }
 
-        private bool IsCurablePsychologicalTrait(Pawn pawn, Trait t)
-        {
-            string defName = t.def.defName;
-            
-            // Custom PTSD
-            if (defName == "Synapse_PTSD") return true;
-            
-            // Vanilla Psychopath and Bloodlust
-            if (defName == "Psychopath" || defName == "Bloodlust")
-            {
-                // Check if backstory locked
-                string childId = pawn.story?.Childhood?.identifier ?? "";
-                string adultId = pawn.story?.Adulthood?.identifier ?? "";
-                
-                if (childId.Contains("Assassin") || adultId.Contains("Assassin") || 
-                    childId.Contains("Killer") || adultId.Contains("Killer"))
-                {
-                    return false; // Locked by homicidal backstory
-                }
-                return true;
-            }
-            
-            // Vanilla NaturalMood (Depressive = -2, Pessimist = -1)
-            if (defName == "NaturalMood" && (t.Degree == -2 || t.Degree == -1))
-            {
-                return true;
-            }
-            
-            // Vanilla Nerves (Volatile = -2, Nervous = -1)
-            if (defName == "Nerves" && (t.Degree == -2 || t.Degree == -1))
-            {
-                return true;
-            }
-            
-            return false;
+            string mote = target != null
+                ? (helped ? $"Therapy: {target.LabelBase} eased" : "Therapy: little progress")
+                : (helped ? "Therapy helped" : "Therapy: awkward");
+            MoteMaker.ThrowText(TargetPawn.DrawPos, TargetPawn.Map, mote, 4f);
+
+            // #17: every completed session — Guiding Hand, Watch, or Background — is remembered by BOTH
+            // participants (a Therapy-tagged memory + transcript). Deterministic backbone; the LLM dialogue,
+            // when there was one, only supplies the transcript lines.
+            API.SynapseTherapy.RecordSession(pawn, TargetPawn, helped, backgroundChatLog);
         }
     }
 }

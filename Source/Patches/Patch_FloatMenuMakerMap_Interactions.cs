@@ -5,6 +5,7 @@ using RimWorld;
 using UnityEngine;
 using Verse;
 using Verse.AI;
+using RimSynapse.Psychology.Jobs;
 
 namespace RimSynapse.Psychology.Patches
 {
@@ -35,54 +36,42 @@ namespace RimSynapse.Psychology.Patches
                         continue;
                     }
 
-                    string label = (targetPawn.Faction == pawn.Faction || targetPawn.IsPrisoner || targetPawn.IsSlaveOfColony) 
-                        ? "Initiate Therapy Session" 
+                    string baseLabel = (targetPawn.Faction == pawn.Faction || targetPawn.IsPrisoner || targetPawn.IsSlaveOfColony)
+                        ? "Initiate Therapy Session"
                         : "Attempt Recruitment / Conversion";
 
-                    // Build float menu option
-                    __result.Add(new FloatMenuOption(label, () =>
-                    {
-                        // Acceptance logic
-                        bool accepted = true;
-                        string rejectReason = "";
-
-                        // Slaves/Prisoners always accept. Colonists might reject. Visitors might reject.
-                        if (!targetPawn.IsPrisoner && !targetPawn.IsSlaveOfColony)
-                        {
-                            // Opinion check
-                            int opinion = targetPawn.relations.OpinionOf(pawn);
-                            if (opinion < -20)
-                            {
-                                accepted = false;
-                                rejectReason = "Hates you";
-                                
-                                // Insulted reaction if they are a visitor
-                                if (targetPawn.Faction != pawn.Faction && targetPawn.Faction != null)
-                                {
-                                    // targetPawn.Faction.TryAffectGoodwillWith(pawn.Faction, -5, true, true, HistoryEventDefOf.MemberInsulted);
-                                    Messages.Message($"{targetPawn.LabelShort} was insulted by {pawn.LabelShort}'s approach.", MessageTypeDefOf.NegativeEvent, false);
-                                }
-                            }
-                            // else if (targetPawn.CurJob != null && targetPawn.CurJob.def.isCritical)
-                            // {
-                            //     accepted = false;
-                            //     rejectReason = "Too busy";
-                            // }
-                        }
-
-                        if (!accepted)
-                        {
-                            MoteMaker.ThrowText(targetPawn.DrawPos, targetPawn.Map, rejectReason, Color.red);
-                            return;
-                        }
-
-                        // Success! Issue jobs to both pawns
-                        Job jobInitiator = JobMaker.MakeJob(DefDatabase<JobDef>.GetNamed("Synapse_InitiateTherapy"), targetPawn);
-                        pawn.jobs.TryTakeOrderedJob(jobInitiator);
-                        
-                    }, MenuOptionPriority.Default));
+                    // #17: one entry per session mode. Guiding Hand = you steer each line; Watch = auto-streamed
+                    // dialogue in a window; Resolve in Background = fully headless. All resolve the same outcome.
+                    Pawn therapist = pawn, patient = targetPawn;
+                    __result.Add(new FloatMenuOption($"{baseLabel} (Guiding Hand)", () => OrderTherapy(therapist, patient, TherapyMode.GuidingHand), MenuOptionPriority.Default));
+                    __result.Add(new FloatMenuOption($"{baseLabel} (Watch)", () => OrderTherapy(therapist, patient, TherapyMode.Watch), MenuOptionPriority.Default));
+                    __result.Add(new FloatMenuOption($"{baseLabel} (Resolve in Background)", () => OrderTherapy(therapist, patient, TherapyMode.Background), MenuOptionPriority.Default));
                 }
             }
+        }
+
+        /// <summary>Run the acceptance check, then order the therapy job with the chosen mode stashed in
+        /// <see cref="Job.count"/> (read once by <see cref="JobDriver_TherapySession"/> at session start).</summary>
+        private static void OrderTherapy(Pawn therapist, Pawn patient, TherapyMode mode)
+        {
+            if (therapist == null || patient == null) return;
+
+            // Slaves/Prisoners always accept. A colonist/visitor who hates the therapist refuses.
+            if (!patient.IsPrisoner && !patient.IsSlaveOfColony)
+            {
+                int opinion = patient.relations?.OpinionOf(therapist) ?? 0;
+                if (opinion < -20)
+                {
+                    MoteMaker.ThrowText(patient.DrawPos, patient.Map, "Hates you", Color.red);
+                    if (patient.Faction != therapist.Faction && patient.Faction != null)
+                        Messages.Message($"{patient.LabelShort} was insulted by {therapist.LabelShort}'s approach.", MessageTypeDefOf.NegativeEvent, false);
+                    return;
+                }
+            }
+
+            Job job = JobMaker.MakeJob(DefDatabase<JobDef>.GetNamed("Synapse_InitiateTherapy"), patient);
+            job.count = (int)mode; // #17: carries the mode to the JobDriver
+            therapist.jobs.TryTakeOrderedJob(job);
         }
     }
 }

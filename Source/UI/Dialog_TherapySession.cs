@@ -23,12 +23,13 @@ namespace RimSynapse.Psychology.UI
 
         public override Vector2 InitialSize => new Vector2(500f, 600f);
 
-        public Dialog_TherapySession(Pawn initiator, Pawn target, JobDriver_TherapySession driver)
+        public Dialog_TherapySession(Pawn initiator, Pawn target, JobDriver_TherapySession driver, bool guidingHand = false)
         {
             this.initiator = initiator;
             this.target = target;
             this.driver = driver;
-            
+            this.guidingHand = guidingHand; // #17: Guiding Hand starts manual; Watch starts auto-streaming
+
             this.forcePause = false;
             this.preventCameraMotion = false;
             this.doCloseX = true;

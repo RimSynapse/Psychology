@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+  <!--
+    Treatable psychological conditions (#17 redesign). Unlike vanilla illnesses these do NOT resolve
+    on their own — no immunity, no natural severity decline. They persist until therapy drives severity
+    to zero (SynapseTherapyConditions.Treat), and while untreated the pawn falls into the linked mental
+    state more often, scaled by severity (SynapseTherapyConditions.TickChaos). Severity 0..1; the stages
+    are display bands. Not medically tendable — therapy in the patient's own bedroom is the treatment.
+  -->
+
+  <HediffDef>
+    <defName>Synapse_Hediff_Trauma</defName>
+    <label>trauma</label>
+    <description>A deep, unresolved traumatic wound. Left untreated it intrudes without warning — the mind is dragged back into the moment. Talking it through, patiently and in private, is the only thing that lastingly helps.</description>
+    <hediffClass>HediffWithComps</hediffClass>
+    <isBad>true</isBad>
+    <maxSeverity>1.0</maxSeverity>
+    <scenarioCanAdd>false</scenarioCanAdd>
+    <tendable>false</tendable>
+    <defaultLabelColor>(0.72, 0.5, 0.82)</defaultLabelColor>
+    <stages>
+      <li><label>mild</label><minSeverity>0</minSeverity></li>
+      <li><label>moderate</label><minSeverity>0.4</minSeverity></li>
+      <li><label>severe</label><minSeverity>0.75</minSeverity></li>
+    </stages>
+  </HediffDef>
+
+  <HediffDef>
+    <defName>Synapse_Hediff_Depression</defName>
+    <label>depression</label>
+    <description>A persistent, heavy low that colours everything. It does not lift by itself; without help the person withdraws and gives up more and more. Steady, private counselling slowly loosens its grip.</description>
+    <hediffClass>HediffWithComps</hediffClass>
+    <isBad>true</isBad>
+    <maxSeverity>1.0</maxSeverity>
+    <scenarioCanAdd>false</scenarioCanAdd>
+    <tendable>false</tendable>
+    <defaultLabelColor>(0.45, 0.55, 0.72)</defaultLabelColor>
+    <stages>
+      <li><label>mild</label><minSeverity>0</minSeverity></li>
+      <li><label>moderate</label><minSeverity>0.4</minSeverity></li>
+      <li><label>severe</label><minSeverity>0.75</minSeverity></li>
+    </stages>
+  </HediffDef>
+
+  <HediffDef>
+    <defName>Synapse_Hediff_Anxiety</defName>
+    <label>anxiety disorder</label>
+    <description>A chronic, jangling dread. Untreated it boils over into panic at the worst moments. Being talked down and reassured, again and again in a safe place, is what eventually settles it.</description>
+    <hediffClass>HediffWithComps</hediffClass>
+    <isBad>true</isBad>
+    <maxSeverity>1.0</maxSeverity>
+    <scenarioCanAdd>false</scenarioCanAdd>
+    <tendable>false</tendable>
+    <defaultLabelColor>(0.85, 0.72, 0.42)</defaultLabelColor>
+    <stages>
+      <li><label>mild</label><minSeverity>0</minSeverity></li>
+      <li><label>moderate</label><minSeverity>0.4</minSeverity></li>
+      <li><label>severe</label><minSeverity>0.75</minSeverity></li>
+    </stages>
+  </HediffDef>
+
+  <HediffDef>
+    <defName>Synapse_Hediff_Bipolar</defName>
+    <label>bipolar disorder</label>
+    <description>Violent swings between crushing lows and reckless, euphoric highs. Left untreated the highs turn dangerous. Steady counselling — and, ideally, mood stabilisers — evens the peaks and troughs out.</description>
+    <hediffClass>HediffWithComps</hediffClass>
+    <isBad>true</isBad>
+    <maxSeverity>1.0</maxSeverity>
+    <scenarioCanAdd>false</scenarioCanAdd>
+    <tendable>false</tendable>
+    <defaultLabelColor>(0.62, 0.42, 0.72)</defaultLabelColor>
+    <stages>
+      <li><label>mild</label><minSeverity>0</minSeverity></li>
+      <li><label>moderate</label><minSeverity>0.4</minSeverity></li>
+      <li><label>severe</label><minSeverity>0.75</minSeverity></li>
+    </stages>
+  </HediffDef>
+
+  <HediffDef>
+    <defName>Synapse_Hediff_Neurotic</defName>
+    <label>neurosis</label>
+    <description>A raw, over-reactive temperament that frays at the smallest setback and breaks far more often than most. Patient, repeated counselling gradually thickens their skin.</description>
+    <hediffClass>HediffWithComps</hediffClass>
+    <isBad>true</isBad>
+    <maxSeverity>1.0</maxSeverity>
+    <scenarioCanAdd>false</scenarioCanAdd>
+    <tendable>false</tendable>
+    <defaultLabelColor>(0.80, 0.66, 0.50)</defaultLabelColor>
+    <stages>
+      <li><label>mild</label><minSeverity>0</minSeverity></li>
+      <li><label>moderate</label><minSeverity>0.4</minSeverity></li>
+      <li><label>severe</label><minSeverity>0.75</minSeverity></li>
+    </stages>
+  </HediffDef>
+
+  <!--
+    Pyromania is CHRONIC (like a genetic drug dependency): it never truly goes away. Therapy MANAGES it —
+    holding severity low so the urge rarely takes over — but the seeding trait is never lifted, and without
+    ongoing treatment the compulsion creeps back and they go and set fires. Modelled with curable=false and a
+    managed floor in SynapseTherapyConditions.
+  -->
+  <HediffDef>
+    <defName>Synapse_Hediff_Pyromania</defName>
+    <label>pyromania</label>
+    <description>An irresistible fascination with fire. It cannot be cured, only kept in check — steady therapy holds the compulsion down so it rarely surfaces, but neglect it and the urge to set things alight comes roaring back.</description>
+    <hediffClass>HediffWithComps</hediffClass>
+    <isBad>true</isBad>
+    <maxSeverity>1.0</maxSeverity>
+    <scenarioCanAdd>false</scenarioCanAdd>
+    <tendable>false</tendable>
+    <defaultLabelColor>(0.88, 0.45, 0.28)</defaultLabelColor>
+    <stages>
+      <li><label>managed</label><minSeverity>0</minSeverity></li>
+      <li><label>restless</label><minSeverity>0.4</minSeverity></li>
+      <li><label>compulsive</label><minSeverity>0.75</minSeverity></li>
+    </stages>
+  </HediffDef>
+
+  <!--
+    Grief is the first EVENT-driven condition: it arises when someone close dies, not from a trait, and unlike
+    the others it slowly fades on its own (the SeverityPerDay comp). Therapy accelerates that fade; left alone
+    a severe grief still eases over a couple of weeks. Not seeded or worsened by SynapseTherapyConditions
+    (no trait), so its only progression is the comp's natural decline.
+  -->
+  <HediffDef>
+    <defName>Synapse_Hediff_Grief</defName>
+    <label>grief</label>
+    <description>The raw ache of a loss that hasn't been processed. It dulls with time, but sitting with someone who will listen speeds the healing and keeps it from curdling into something worse.</description>
+    <hediffClass>HediffWithComps</hediffClass>
+    <isBad>true</isBad>
+    <maxSeverity>1.0</maxSeverity>
+    <scenarioCanAdd>false</scenarioCanAdd>
+    <tendable>false</tendable>
+    <defaultLabelColor>(0.55, 0.58, 0.62)</defaultLabelColor>
+    <comps>
+      <li Class="HediffCompProperties_SeverityPerDay">
+        <severityPerDay>-0.08</severityPerDay>
+      </li>
+    </comps>
+    <stages>
+      <li><label>numb</label><minSeverity>0</minSeverity></li>
+      <li><label>mourning</label><minSeverity>0.4</minSeverity></li>
+      <li><label>inconsolable</label><minSeverity>0.75</minSeverity></li>
+    </stages>
+  </HediffDef>
+
+</Defs>

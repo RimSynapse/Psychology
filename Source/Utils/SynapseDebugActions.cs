@@ -1111,6 +1111,188 @@ namespace RimSynapse.Psychology.Utils
                 $"  {witness.LabelShort}: {iWit} [expect Witness]\n" +
                 (stranger != null ? $"  {stranger.LabelShort}: {iStr} [expect None]\n" : "  (no 4th colonist to check the None tier)\n"));
         }
+
+        /// <summary>#17: validate the therapy-session completion backbone — a successful session records a
+        /// Therapy-tagged memory AND a transcript on BOTH participants (the same path every session mode runs
+        /// on completion). Uses the map's first two free colonists; no args, so it is triggerable via the
+        /// RimAgentic run_debug_action bridge.</summary>
+        [DebugAction("RimSynapse", "Therapy: Validate session records both pawns (#17) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateTherapySessionRecord()
+        {
+            var cs = Find.CurrentMap?.mapPawns?.FreeColonists;
+            if (cs == null || cs.Count < 2)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse #17] Need >=2 free colonists (have {cs?.Count ?? 0}).");
+                return;
+            }
+            Pawn therapist = cs[0], patient = cs[1];
+
+            int TherapyMems(Pawn p)
+            {
+                var core = p.TryGetComp<SynapseCorePawnComp>();
+                if (core?.memories == null) return 0;
+                int n = 0;
+                foreach (var m in core.memories)
+                    if (m.memoryType == "Therapy") n++;
+                return n;
+            }
+            int TranscriptCount(Pawn p) => p.TryGetComp<SynapsePawnComp>()?.therapyTranscripts?.Count ?? 0;
+
+            int tBefore = TherapyMems(therapist), pBefore = TherapyMems(patient);
+            int tScriptBefore = TranscriptCount(therapist), pScriptBefore = TranscriptCount(patient);
+
+            RimSynapse.Psychology.API.SynapseTherapy.RecordSession(therapist, patient, success: true);
+
+            int tAfter = TherapyMems(therapist), pAfter = TherapyMems(patient);
+            int tScriptAfter = TranscriptCount(therapist), pScriptAfter = TranscriptCount(patient);
+
+            bool bothMem = tAfter == tBefore + 1 && pAfter == pBefore + 1;
+            bool bothScript = tScriptAfter == tScriptBefore + 1 && pScriptAfter == pScriptBefore + 1;
+            bool pass = bothMem && bothScript;
+
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse #17] Therapy session record: {(pass ? "PASS" : "FAIL")}\n" +
+                $"  {therapist.LabelShort} (therapist): Therapy memories {tBefore}->{tAfter}, transcripts {tScriptBefore}->{tScriptAfter}\n" +
+                $"  {patient.LabelShort} (patient):   Therapy memories {pBefore}->{pAfter}, transcripts {pScriptBefore}->{pScriptAfter}\n" +
+                $"  both gained a memory: {bothMem}; both gained a transcript: {bothScript}");
+        }
+
+        /// <summary>#17 redesign: validate therapy-as-treatable-condition — a WEIGHTED session lowers a condition's
+        /// severity and cures it at zero (removing the hediff), a poor session sets it back, and an untreated
+        /// condition can be thrown into its linked mental state (chaos). No args; cleans up after itself.</summary>
+        [DebugAction("RimSynapse", "Therapy: Validate condition treatment (#17) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateTherapyConditions()
+        {
+            var cs = Find.CurrentMap?.mapPawns?.FreeColonists;
+            if (cs == null || cs.Count < 2)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse #17] Need >=2 free colonists (have {cs?.Count ?? 0}).");
+                return;
+            }
+            Pawn therapist = cs[0], patient = cs[1];
+            var traumaDef = DefDatabase<HediffDef>.GetNamedSilentFail("Synapse_Hediff_Trauma");
+            if (traumaDef == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse #17] Synapse_Hediff_Trauma def missing."); return; }
+
+            bool startedMentalState = false;
+            try
+            {
+                // (1) Good sessions (quality 1.0) drive severity down and cure at zero.
+                var h = HediffMaker.MakeHediff(traumaDef, patient); h.Severity = 0.8f; patient.health.AddHediff(h);
+                var traj = new System.Collections.Generic.List<string> { "0.80" };
+                bool monotonic = true; float prev = h.Severity; int sessions = 0;
+                while (patient.health.hediffSet.HasHediff(traumaDef) && sessions < 8)
+                {
+                    SynapseTherapyConditions.Treat(therapist, patient, h, 1.0f); sessions++;
+                    float sev = patient.health.hediffSet.HasHediff(traumaDef) ? h.Severity : 0f;
+                    traj.Add(sev.ToString("0.00"));
+                    if (sev > prev + 0.0001f) monotonic = false;
+                    prev = sev;
+                }
+                bool cured = !patient.health.hediffSet.HasHediff(traumaDef);
+                bool goodOk = monotonic && cured && sessions <= 6;
+
+                // (2) A poor session (quality 0.1) is a setback — severity rises.
+                var h2 = HediffMaker.MakeHediff(traumaDef, patient); h2.Severity = 0.4f; patient.health.AddHediff(h2);
+                float before = h2.Severity;
+                SynapseTherapyConditions.Treat(therapist, patient, h2, 0.1f);
+                bool setback = h2.Severity > before;
+                if (patient.health.hediffSet.HasHediff(traumaDef)) patient.health.RemoveHediff(h2);
+
+                // (3) Quality is a real weighted number in [0,1].
+                float q = SynapseTherapyConditions.Quality(therapist, patient, patient.GetRoom());
+                bool qOk = q >= 0f && q <= 1f;
+
+                // (4) Chaos: an untreated condition can be forced into its linked mental state.
+                bool chaosOk = false;
+                if (!patient.InMentalState)
+                {
+                    var traumaState = DefDatabase<MentalStateDef>.GetNamedSilentFail("Synapse_TraumaTrigger");
+                    chaosOk = traumaState != null && SynapseTherapyConditions.TryStartChaos(patient, traumaState);
+                    startedMentalState = chaosOk && patient.InMentalState;
+                }
+
+                bool pass = goodOk && setback && qOk && chaosOk;
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"[RimSynapse #17] Condition treatment: {(pass ? "PASS" : "FAIL")}\n" +
+                    $"  (1) good sessions cure: {goodOk} (severity {string.Join(" -> ", traj)}, cured in {sessions})\n" +
+                    $"  (2) poor session setback: {setback} ({before:0.00} -> {h2.Severity:0.00})\n" +
+                    $"  (3) weighted quality in range: {qOk} (q={q:0.00} for {therapist.LabelShort}->{patient.LabelShort})\n" +
+                    $"  (4) untreated -> chaos state started: {chaosOk}");
+            }
+            finally
+            {
+                // Clean up: recover any forced break and strip any leftover test hediffs.
+                if (startedMentalState && patient.InMentalState) patient.MentalState.RecoverFromState();
+                var leftover = patient.health.hediffSet?.GetFirstHediffOfDef(traumaDef);
+                while (leftover != null) { patient.health.RemoveHediff(leftover); leftover = patient.health.hediffSet.GetFirstHediffOfDef(traumaDef); }
+            }
+        }
+
+        /// <summary>#17: validate the CHRONIC pyromania model (managed to a floor, never cured, drifts back
+        /// untreated) and event-driven GRIEF seeding + treatment. No args; cleans up.</summary>
+        [DebugAction("RimSynapse", "Therapy: Validate chronic + grief conditions (#17) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateChronicAndGrief()
+        {
+            var cs = Find.CurrentMap?.mapPawns?.FreeColonists;
+            if (cs == null || cs.Count < 2)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse #17] Need >=2 free colonists (have {cs?.Count ?? 0}).");
+                return;
+            }
+            Pawn therapist = cs[0], patient = cs[1];
+            var pyroDef = DefDatabase<HediffDef>.GetNamedSilentFail("Synapse_Hediff_Pyromania");
+            var griefDef = DefDatabase<HediffDef>.GetNamedSilentFail("Synapse_Hediff_Grief");
+            if (pyroDef == null || griefDef == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse #17] condition hediff defs missing."); return; }
+
+            float savedWarmth = float.NaN; string tId = therapist.GetUniqueLoadID();
+            var pc = patient.GetComp<SynapsePawnComp>();
+            try
+            {
+                // (1) Chronic pyromania: treat it down to the managed floor but NEVER cured / trait never lifts.
+                var h = HediffMaker.MakeHediff(pyroDef, patient); h.Severity = 0.8f; patient.health.AddHediff(h);
+                for (int i = 0; i < 8 && patient.health.hediffSet.HasHediff(pyroDef); i++)
+                    SynapseTherapyConditions.Treat(therapist, patient, h, 1.0f);
+                bool stillPresent = patient.health.hediffSet.HasHediff(pyroDef);
+                float floored = stillPresent ? h.Severity : -1f;
+                bool managedOk = stillPresent && floored <= 0.11f && floored >= 0.09f;
+
+                // (2) Chronic drift: untreated, the urge creeps back up.
+                float beforeDrift = h.Severity;
+                for (int i = 0; i < 5; i++) SynapseTherapyConditions.TickProgression(patient);
+                bool driftOk = h.Severity > beforeDrift;
+                if (patient.health.hediffSet.HasHediff(pyroDef)) patient.health.RemoveHediff(h);
+
+                // (3) Grief seeds from closeness (force it via compass warmth) and is curable.
+                if (pc?.socialNetwork != null)
+                {
+                    if (!pc.socialNetwork.ContainsKey(tId)) pc.socialNetwork[tId] = new RimSynapse.Psychology.Models.SocialRecord();
+                    savedWarmth = pc.socialNetwork[tId].warmth;
+                    pc.socialNetwork[tId].warmth = 100f;
+                }
+                float g = SynapseTherapyConditions.SeedGrief(patient, therapist);
+                bool griefSeeded = g > 0f && patient.health.hediffSet.HasHediff(griefDef);
+                var gh = patient.health.hediffSet.GetFirstHediffOfDef(griefDef);
+                if (gh != null) { float gb = gh.Severity; SynapseTherapyConditions.Treat(therapist, patient, gh, 1.0f); }
+                bool griefTreatable = gh == null || !patient.health.hediffSet.HasHediff(griefDef) || gh.Severity < g;
+
+                bool pass = managedOk && driftOk && griefSeeded && griefTreatable;
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"[RimSynapse #17] Chronic + grief: {(pass ? "PASS" : "FAIL")}\n" +
+                    $"  (1) pyromania managed not cured: {managedOk} (floored at {floored:0.00}, hediff present: {stillPresent})\n" +
+                    $"  (2) untreated drifts back up: {driftOk} ({beforeDrift:0.00} -> {h.Severity:0.00})\n" +
+                    $"  (3) grief seeded from closeness: {griefSeeded} (severity {g:0.00}); treatable: {griefTreatable}");
+            }
+            finally
+            {
+                foreach (var def in new[] { pyroDef, griefDef })
+                {
+                    var left = patient.health.hediffSet?.GetFirstHediffOfDef(def);
+                    while (left != null) { patient.health.RemoveHediff(left); left = patient.health.hediffSet.GetFirstHediffOfDef(def); }
+                }
+                if (pc?.socialNetwork != null && !float.IsNaN(savedWarmth) && pc.socialNetwork.ContainsKey(tId))
+                    pc.socialNetwork[tId].warmth = savedWarmth;
+            }
+        }
     }
 }
 
