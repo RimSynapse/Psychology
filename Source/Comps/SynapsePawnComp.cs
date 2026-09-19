@@ -291,6 +291,16 @@ namespace RimSynapse.Psychology.Comps
                 {
                     socialTickCounter = 0;
                     UpdateSocialNetwork(pawn);
+
+                    // #17: psychological conditions as treatable illnesses — seed them from the pawn's psyche,
+                    // let neglect (sustained misery) worsen them, and throw them into the linked mental state
+                    // more often the worse they are. Colony-affiliated pawns only.
+                    if (pawn.IsColonist || pawn.IsPrisonerOfColony || pawn.IsSlaveOfColony)
+                    {
+                        RimSynapse.Psychology.API.SynapseTherapyConditions.EnsureSeeded(pawn);
+                        RimSynapse.Psychology.API.SynapseTherapyConditions.WorsenIfNeglected(pawn);
+                        RimSynapse.Psychology.API.SynapseTherapyConditions.TickChaos(pawn, 2500);
+                    }
                 }
             }
 
@@ -378,7 +388,15 @@ namespace RimSynapse.Psychology.Comps
                 therapyBlockReason = "Mental state too unstable for therapy.";
                 return;
             }
-            
+
+            // #17 redesign: therapy is done in the patient's OWN bedroom, so they need one.
+            if (pawn.ownership?.OwnedBed == null)
+            {
+                isTherapyReady = false;
+                therapyBlockReason = "Needs their own bedroom for therapy.";
+                return;
+            }
+
             // Check for locked traits
             if (pawn.story != null)
             {

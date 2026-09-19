@@ -1156,6 +1156,77 @@ namespace RimSynapse.Psychology.Utils
                 $"  {patient.LabelShort} (patient):   Therapy memories {pBefore}->{pAfter}, transcripts {pScriptBefore}->{pScriptAfter}\n" +
                 $"  both gained a memory: {bothMem}; both gained a transcript: {bothScript}");
         }
+
+        /// <summary>#17 redesign: validate therapy-as-treatable-condition — a WEIGHTED session lowers a condition's
+        /// severity and cures it at zero (removing the hediff), a poor session sets it back, and an untreated
+        /// condition can be thrown into its linked mental state (chaos). No args; cleans up after itself.</summary>
+        [DebugAction("RimSynapse", "Therapy: Validate condition treatment (#17) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateTherapyConditions()
+        {
+            var cs = Find.CurrentMap?.mapPawns?.FreeColonists;
+            if (cs == null || cs.Count < 2)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse #17] Need >=2 free colonists (have {cs?.Count ?? 0}).");
+                return;
+            }
+            Pawn therapist = cs[0], patient = cs[1];
+            var traumaDef = DefDatabase<HediffDef>.GetNamedSilentFail("Synapse_Hediff_Trauma");
+            if (traumaDef == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse #17] Synapse_Hediff_Trauma def missing."); return; }
+
+            bool startedMentalState = false;
+            try
+            {
+                // (1) Good sessions (quality 1.0) drive severity down and cure at zero.
+                var h = HediffMaker.MakeHediff(traumaDef, patient); h.Severity = 0.8f; patient.health.AddHediff(h);
+                var traj = new System.Collections.Generic.List<string> { "0.80" };
+                bool monotonic = true; float prev = h.Severity; int sessions = 0;
+                while (patient.health.hediffSet.HasHediff(traumaDef) && sessions < 8)
+                {
+                    SynapseTherapyConditions.Treat(therapist, patient, h, 1.0f); sessions++;
+                    float sev = patient.health.hediffSet.HasHediff(traumaDef) ? h.Severity : 0f;
+                    traj.Add(sev.ToString("0.00"));
+                    if (sev > prev + 0.0001f) monotonic = false;
+                    prev = sev;
+                }
+                bool cured = !patient.health.hediffSet.HasHediff(traumaDef);
+                bool goodOk = monotonic && cured && sessions <= 6;
+
+                // (2) A poor session (quality 0.1) is a setback — severity rises.
+                var h2 = HediffMaker.MakeHediff(traumaDef, patient); h2.Severity = 0.4f; patient.health.AddHediff(h2);
+                float before = h2.Severity;
+                SynapseTherapyConditions.Treat(therapist, patient, h2, 0.1f);
+                bool setback = h2.Severity > before;
+                if (patient.health.hediffSet.HasHediff(traumaDef)) patient.health.RemoveHediff(h2);
+
+                // (3) Quality is a real weighted number in [0,1].
+                float q = SynapseTherapyConditions.Quality(therapist, patient, patient.GetRoom());
+                bool qOk = q >= 0f && q <= 1f;
+
+                // (4) Chaos: an untreated condition can be forced into its linked mental state.
+                bool chaosOk = false;
+                if (!patient.InMentalState)
+                {
+                    var traumaState = DefDatabase<MentalStateDef>.GetNamedSilentFail("Synapse_TraumaTrigger");
+                    chaosOk = traumaState != null && SynapseTherapyConditions.TryStartChaos(patient, traumaState);
+                    startedMentalState = chaosOk && patient.InMentalState;
+                }
+
+                bool pass = goodOk && setback && qOk && chaosOk;
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"[RimSynapse #17] Condition treatment: {(pass ? "PASS" : "FAIL")}\n" +
+                    $"  (1) good sessions cure: {goodOk} (severity {string.Join(" -> ", traj)}, cured in {sessions})\n" +
+                    $"  (2) poor session setback: {setback} ({before:0.00} -> {h2.Severity:0.00})\n" +
+                    $"  (3) weighted quality in range: {qOk} (q={q:0.00} for {therapist.LabelShort}->{patient.LabelShort})\n" +
+                    $"  (4) untreated -> chaos state started: {chaosOk}");
+            }
+            finally
+            {
+                // Clean up: recover any forced break and strip any leftover test hediffs.
+                if (startedMentalState && patient.InMentalState) patient.MentalState.RecoverFromState();
+                var leftover = patient.health.hediffSet?.GetFirstHediffOfDef(traumaDef);
+                while (leftover != null) { patient.health.RemoveHediff(leftover); leftover = patient.health.hediffSet.GetFirstHediffOfDef(traumaDef); }
+            }
+        }
     }
 }
 
