@@ -1293,6 +1293,58 @@ namespace RimSynapse.Psychology.Utils
                     pc.socialNetwork[tId].warmth = savedWarmth;
             }
         }
+
+        /// <summary>#21: validate faction-leader context injection — a subscriber's text and the leadership
+        /// hierarchy line both weave into the visitor/leader prompt, and nothing is added when nothing is
+        /// registered. No args; restores the global hook + provider.</summary>
+        [DebugAction("RimSynapse", "Leaders: Validate context injection (#21) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateLeaderContextInjection()
+        {
+            var pawn = Find.CurrentMap?.mapPawns?.FreeColonists?.FirstOrDefault();
+            if (pawn == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse #21] Need a free colonist."); return; }
+
+            const string sentinel = "SENTINEL_LeaderCtx_21";
+            var core = pawn.TryGetComp<SynapseCorePawnComp>();
+
+            // Baseline: nothing registered -> no injected block.
+            string bare = SynapsePsychology.BuildVisitorAdulthoodUserMessage(pawn, core, "TestFaction", "Outlander");
+            bool cleanBaseline = !bare.Contains(sentinel) && !bare.Contains("Leadership:") && bare.Contains("Visitor:");
+
+            var savedProvider = RimSynapse.SynapseCoreHierarchy.Provider;
+            RimSynapse.SynapseCoreContext.ContextInjectionHandler handler = (p, type, list) =>
+            {
+                if (type == RimSynapse.SynapseContextTypes.BackstoryAdulthood) list.Add(sentinel);
+            };
+            RimSynapse.SynapseCoreContext.OnInjectGenericContext += handler;
+            RimSynapse.SynapseCoreHierarchy.Provider = new SynapseDebugLeaderProvider { who = pawn };
+            bool injected, hierarchy;
+            try
+            {
+                string wired = SynapsePsychology.BuildVisitorAdulthoodUserMessage(pawn, core, "TestFaction", "Outlander");
+                injected = wired.Contains(sentinel);
+                hierarchy = wired.Contains("Leadership:") && wired.Contains("Faction Leader");
+            }
+            finally
+            {
+                RimSynapse.SynapseCoreContext.OnInjectGenericContext -= handler;
+                RimSynapse.SynapseCoreHierarchy.Provider = savedProvider;
+            }
+
+            bool pass = cleanBaseline && injected && hierarchy;
+            RimSynapse.SynapseLogger.Info("psychology",
+                $"[RimSynapse #21] Leader context injection: {(pass ? "PASS" : "FAIL")}\n" +
+                $"  clean without subscriber: {cleanBaseline}\n" +
+                $"  subscriber text woven into prompt: {injected}\n" +
+                $"  hierarchy role line woven in: {hierarchy}");
+        }
+
+        private sealed class SynapseDebugLeaderProvider : RimSynapse.SynapseCoreHierarchy.IHierarchyProvider
+        {
+            public Pawn who;
+            public object ReportsTo(object node) => null;
+            public System.Collections.Generic.IEnumerable<object> DirectReports(object node) => System.Linq.Enumerable.Empty<object>();
+            public string RoleTitle(object node) => ReferenceEquals(node, who) ? "Faction Leader" : null;
+        }
     }
 }
 

@@ -17,13 +17,69 @@ namespace RimSynapse.Psychology.API
     /// </summary>
     public static partial class SynapsePsychology
     {
-        private static void GenerateVisitorChildhoodMemory(Pawn pawn, RimSynapse.Comps.SynapseCorePawnComp coreComp, string factionName, string factionType)
+        /// <summary>#21: build the visitor CHILDHOOD prompt, weaving in cross-mod leader context. Factions
+        /// injects faction history / ideology / leadership style via <see cref="RimSynapse.SynapseCoreContext.GatherGenericContext"/>
+        /// (the same hook the colonist path uses), and the leadership hierarchy (who they report to / their role)
+        /// via <see cref="RimSynapse.SynapseCoreHierarchy"/>. Both are zero-subscriber / zero-provider safe, so
+        /// with nothing registered the prompt is exactly as before. Split out so tests can assert the injection.</summary>
+        internal static string BuildVisitorChildhoodUserMessage(Pawn pawn, string factionName, string factionType)
         {
-            var childhood = pawn.story.Childhood;
+            var childhood = pawn.story?.Childhood;
             string childhoodTitle = childhood?.title ?? "Unknown";
             string childhoodDesc = childhood?.description ?? "An unremarkable childhood.";
             string skillBonuses = FormatSkillGains(childhood);
+            string hierarchy = HierarchyContext(pawn);
+            string context = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.BackstoryChildhood);
 
+            return $@"Visitor: {pawn.Name.ToStringShort} from {factionName} ({factionType})
+Childhood: ""{childhoodTitle}""
+Description: ""{childhoodDesc}""
+Skills: {skillBonuses}{hierarchy}{context}";
+        }
+
+        /// <summary>#21: build the visitor ADULTHOOD prompt with the same cross-mod leader context + hierarchy,
+        /// plus childhood/hometown continuity. Testable seam.</summary>
+        internal static string BuildVisitorAdulthoodUserMessage(Pawn pawn, RimSynapse.Comps.SynapseCorePawnComp coreComp, string factionName, string factionType)
+        {
+            var adulthood = pawn.story?.Adulthood;
+            string adulthoodTitle = adulthood?.title ?? "Unknown";
+            string adulthoodDesc = adulthood?.description ?? "An uneventful adult life.";
+            string skillBonuses = FormatSkillGains(adulthood);
+
+            var childhoodMem = coreComp?.memories?.LastOrDefault(m => m.memoryType == "BackstoryChildhood");
+            string childhoodContext = childhoodMem != null
+                ? $"\nChildhood Memory (maintain continuity): \"{childhoodMem.summary}\""
+                : "";
+            string hometownContext = !string.IsNullOrEmpty(coreComp?.hometown)
+                ? $"\nHometown: {coreComp.hometown}"
+                : "";
+            string hierarchy = HierarchyContext(pawn);
+            string context = RimSynapse.SynapseCoreContext.GatherGenericContext(pawn, RimSynapse.SynapseContextTypes.BackstoryAdulthood);
+
+            return $@"Visitor: {pawn.Name.ToStringShort} from {factionName} ({factionType})
+Adulthood: ""{adulthoodTitle}""
+Description: ""{adulthoodDesc}""
+Skills: {skillBonuses}{hometownContext}{childhoodContext}{hierarchy}{context}";
+        }
+
+        /// <summary>#21: a one-line hierarchy note from the (open-ended) leadership hook — the pawn's role and who
+        /// they report to — so an LLM-authored leader reflects their rank. Empty until a mod (Factions) registers
+        /// a hierarchy provider, so this adds nothing today.</summary>
+        internal static string HierarchyContext(Pawn pawn)
+        {
+            if (pawn == null) return "";
+            string role = RimSynapse.SynapseCoreHierarchy.RoleTitle(pawn);
+            Pawn superior = RimSynapse.SynapseCoreHierarchy.ReportsToPawn(pawn);
+            if (string.IsNullOrEmpty(role) && superior == null) return "";
+
+            var parts = new List<string>();
+            if (!string.IsNullOrEmpty(role)) parts.Add($"Role: {role}");
+            if (superior != null) parts.Add($"Reports to: {superior.Name?.ToStringShort ?? superior.LabelShort}");
+            return "\nLeadership: " + string.Join("; ", parts);
+        }
+
+        private static void GenerateVisitorChildhoodMemory(Pawn pawn, RimSynapse.Comps.SynapseCorePawnComp coreComp, string factionName, string factionType)
+        {
             string systemPrompt = @"You are writing a vivid third-person memory for a visitor in the RimWorld universe, as if the AI Storyteller is describing their childhood.
 This memory is from their CHILDHOOD. Keep it brief and grounded.
 
@@ -44,10 +100,7 @@ You MUST respond in valid JSON:
   ""Tags"": [""Origin"", ""Childhood""]
 }";
 
-            string userMessage = $@"Visitor: {pawn.Name.ToStringShort} from {factionName} ({factionType})
-Childhood: ""{childhoodTitle}""
-Description: ""{childhoodDesc}""
-Skills: {skillBonuses}";
+            string userMessage = BuildVisitorChildhoodUserMessage(pawn, factionName, factionType);
 
             var options = new ChatOptions { priority = 6, requestName = "Visitor Childhood", targetName = pawn.Name.ToStringShort };
 
@@ -117,20 +170,6 @@ Skills: {skillBonuses}";
 
         private static void GenerateVisitorAdulthoodMemory(Pawn pawn, RimSynapse.Comps.SynapseCorePawnComp coreComp, string factionName, string factionType)
         {
-            var adulthood = pawn.story.Adulthood;
-            string adulthoodTitle = adulthood?.title ?? "Unknown";
-            string adulthoodDesc = adulthood?.description ?? "An uneventful adult life.";
-            string skillBonuses = FormatSkillGains(adulthood);
-
-            // Include childhood for continuity if we have it
-            var childhoodMem = coreComp.memories.LastOrDefault(m => m.memoryType == "BackstoryChildhood");
-            string childhoodContext = childhoodMem != null
-                ? $"\nChildhood Memory (maintain continuity): \"{childhoodMem.summary}\""
-                : "";
-            string hometownContext = !string.IsNullOrEmpty(coreComp.hometown)
-                ? $"\nHometown: {coreComp.hometown}"
-                : "";
-
             string systemPrompt = @"You are writing a vivid third-person memory for a visitor in the RimWorld universe, as if the AI Storyteller is describing their adulthood.
 This memory is from their ADULTHOOD. Keep it brief and grounded.
 
@@ -146,10 +185,7 @@ You MUST respond in valid JSON:
   ""Tags"": [""Adulthood"", ""Defining""]
 }";
 
-            string userMessage = $@"Visitor: {pawn.Name.ToStringShort} from {factionName} ({factionType})
-Adulthood: ""{adulthoodTitle}""
-Description: ""{adulthoodDesc}""
-Skills: {skillBonuses}{hometownContext}{childhoodContext}";
+            string userMessage = BuildVisitorAdulthoodUserMessage(pawn, coreComp, factionName, factionType);
 
             var options = new ChatOptions { priority = 7, requestName = "Visitor Adulthood", targetName = pawn.Name.ToStringShort };
 
