@@ -1393,6 +1393,67 @@ namespace RimSynapse.Psychology.Utils
                 }
             }
         }
+
+        /// <summary>#20: validate clique detection — a mutually warm+familiar pair forms a clique (a one-sided
+        /// bond does not), the pawn's clique summary lists the group, and it is injected into social-flavoured
+        /// prompt context but not a backstory stage. No args; restores the social records it touches.</summary>
+        [DebugAction("RimSynapse", "Cliques: Validate detection + context (#20) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateCliqueDetection()
+        {
+            var cs = Find.CurrentMap?.mapPawns?.FreeColonists?.ToList();
+            if (cs == null || cs.Count < 3)
+            {
+                RimSynapse.SynapseLogger.Info("psychology", $"[RimSynapse #20] Need >=3 free colonists (have {cs?.Count ?? 0}).");
+                return;
+            }
+            Pawn a = cs[0], b = cs[1], c = cs[2];
+
+            // Snapshot the four directed records we touch, so we can restore them.
+            var snap = new System.Collections.Generic.List<(SynapsePawnComp comp, string id, bool existed, float w, float f)>();
+            void Set(Pawn from, Pawn to, float w, float f)
+            {
+                var comp = from.GetComp<SynapsePawnComp>();
+                string id = to.GetUniqueLoadID();
+                bool existed = comp.socialNetwork.TryGetValue(id, out var rec);
+                snap.Add((comp, id, existed, existed ? rec.warmth : 0f, existed ? rec.familiarity : 0f));
+                if (!existed) { rec = new RimSynapse.Psychology.Models.SocialRecord(); comp.socialNetwork[id] = rec; }
+                rec.warmth = w; rec.familiarity = f;
+            }
+            try
+            {
+                Set(a, b, 60f, 70f); Set(b, a, 55f, 65f);   // A<->B mutually close
+                Set(a, c, 60f, 70f); Set(c, a, -5f, 65f);   // A->C only (C is cold toward A) => not mutual
+
+                var groups = SynapseCliques.ForMap(Find.CurrentMap, force: true);
+                var cliqueA = SynapseCliques.CliqueOf(a);
+                bool abGrouped = cliqueA.Contains(a) && cliqueA.Contains(b);
+                bool cExcluded = !cliqueA.Contains(c);
+                string summary = SynapseCliques.CliqueSummaryFor(a);
+                bool summaryOk = summary.Contains(b.LabelShort) && !summary.Contains(c.LabelShort);
+
+                var social = new System.Collections.Generic.List<string>();
+                SynapseCliques.InjectCliqueContext(a, RimSynapse.SynapseContextTypes.RelationshipEvaluation, social);
+                var backstory = new System.Collections.Generic.List<string>();
+                SynapseCliques.InjectCliqueContext(a, RimSynapse.SynapseContextTypes.BackstoryChildhood, backstory);
+                bool injectionOk = social.Count == 1 && social[0].Contains(b.LabelShort) && backstory.Count == 0;
+
+                bool pass = abGrouped && cExcluded && summaryOk && injectionOk;
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"[RimSynapse #20] Clique detection: {(pass ? "PASS" : "FAIL")}\n" +
+                    $"  groups detected: {groups.Count}; {a.LabelShort}&{b.LabelShort} grouped: {abGrouped}; one-sided {c.LabelShort} excluded: {cExcluded}\n" +
+                    $"  summary: \"{summary}\" (lists B not C: {summaryOk})\n" +
+                    $"  injected into RelationshipEvaluation only: {injectionOk} (social={social.Count}, backstory={backstory.Count})");
+            }
+            finally
+            {
+                foreach (var s in snap)
+                {
+                    if (s.existed && s.comp.socialNetwork.TryGetValue(s.id, out var rec)) { rec.warmth = s.w; rec.familiarity = s.f; }
+                    else s.comp.socialNetwork.Remove(s.id);
+                }
+                SynapseCliques.ForMap(Find.CurrentMap, force: true); // refresh cache off the restored state
+            }
+        }
     }
 }
 
