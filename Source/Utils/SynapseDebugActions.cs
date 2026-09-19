@@ -1345,6 +1345,54 @@ namespace RimSynapse.Psychology.Utils
             public System.Collections.Generic.IEnumerable<object> DirectReports(object node) => System.Linq.Enumerable.Empty<object>();
             public string RoleTitle(object node) => ReferenceEquals(node, who) ? "Faction Leader" : null;
         }
+
+        /// <summary>#64: validate the now-data-driven euphoria hook — the Synapse_Bipolar def carries the
+        /// SynapseTraitExtension, and AnyTraitCausesEuphoria detects a tagged trait on a pawn (and not once it's
+        /// removed). No args; restores the pawn's traits.</summary>
+        [DebugAction("RimSynapse", "Traits: Validate euphoria hook (#64) (Log)", actionType = DebugActionType.Action, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        public static void ValidateEuphoriaHook()
+        {
+            var pawn = Find.CurrentMap?.mapPawns?.FreeColonists?.FirstOrDefault();
+            if (pawn?.story?.traits == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse #64] Need a free colonist."); return; }
+            var def = DefDatabase<TraitDef>.GetNamedSilentFail("Synapse_Bipolar");
+            if (def == null) { RimSynapse.SynapseLogger.Info("psychology", "[RimSynapse #64] Synapse_Bipolar def missing."); return; }
+
+            var ext = def.GetModExtension<RimSynapse.Psychology.Extensions.SynapseTraitExtension>();
+            bool defTagged = ext != null && ext.causesEuphoria;
+
+            bool hadBefore = pawn.story.traits.HasTrait(def);
+            bool addedForTest = false;
+            try
+            {
+                if (!hadBefore) { pawn.story.traits.GainTrait(new Trait(def, 0, true)); addedForTest = true; }
+                bool detectedWith = RimSynapse.Psychology.Extensions.SynapseTraitExtension.AnyTraitCausesEuphoria(pawn);
+
+                bool detectedWithout = true;
+                if (addedForTest)
+                {
+                    var traitObj = pawn.story.traits.GetTrait(def);
+                    if (traitObj != null) pawn.story.traits.RemoveTrait(traitObj);
+                    detectedWithout = RimSynapse.Psychology.Extensions.SynapseTraitExtension.AnyTraitCausesEuphoria(pawn);
+                }
+                bool nullSafe = !RimSynapse.Psychology.Extensions.SynapseTraitExtension.AnyTraitCausesEuphoria(null);
+
+                bool pass = defTagged && detectedWith && (!addedForTest || !detectedWithout) && nullSafe;
+                RimSynapse.SynapseLogger.Info("psychology",
+                    $"[RimSynapse #64] Euphoria hook: {(pass ? "PASS" : "FAIL")}\n" +
+                    $"  Synapse_Bipolar def carries causesEuphoria: {defTagged}\n" +
+                    $"  detected while tagged trait present: {detectedWith}\n" +
+                    (addedForTest ? $"  not detected once removed: {!detectedWithout}\n" : "  (colonist already had the trait — skipped removal check)\n") +
+                    $"  null-safe: {nullSafe}");
+            }
+            finally
+            {
+                if (addedForTest)
+                {
+                    var leftover = pawn.story.traits.GetTrait(def);
+                    if (leftover != null) pawn.story.traits.RemoveTrait(leftover);
+                }
+            }
+        }
     }
 }
 

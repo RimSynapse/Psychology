@@ -10,6 +10,12 @@
         <description>{PAWN_nameDef} suffers from extreme mood swings. They are capable of plunging into the deepest despairs, but when things are going perfectly, they enter periods of intense euphoria and reckless behavior.</description>
       </li>
     </degreeDatas>
+    <!-- #64: declare the euphoria hook via data instead of the break manager hardcoding this def. -->
+    <modExtensions>
+      <li Class="RimSynapse.Psychology.Extensions.SynapseTraitExtension">
+        <causesEuphoria>true</causesEuphoria>
+      </li>
+    </modExtensions>
   </TraitDef>
 
   <TraitDef>

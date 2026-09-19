@@ -116,14 +116,17 @@ namespace RimSynapse.Psychology.Managers
             // --- EUPHORIA EVALUATION ---
             if (pawn.needs != null && pawn.needs.mood != null && pawn.needs.mood.CurLevelPercentage >= 0.85f)
             {
-                bool hasBipolar = pawn.story?.traits?.HasTrait(PsychologyDefCache.Bipolar) == true ||
-                                  pawn.story?.traits?.HasTrait(PsychologyDefCache.Synapse_Bipolar) == true;
-                
+                // #64: data-driven — any trait declaring causesEuphoria via SynapseTraitExtension (Synapse_Bipolar
+                // carries it) qualifies, so mods can opt in too. The vanilla/other "Bipolar" def (if some mod
+                // adds one) is kept as a null-safe compat fallback.
+                bool hasEuphoriaTrait = RimSynapse.Psychology.Extensions.SynapseTraitExtension.AnyTraitCausesEuphoria(pawn) ||
+                                        pawn.story?.traits?.HasTrait(PsychologyDefCache.Bipolar) == true;
+
                 // Extreme negative occurred within the last 5 days (300,000 ticks)
-                bool recentExtremeNegative = comp.lastExtremeNegativeTick > 0 && 
+                bool recentExtremeNegative = comp.lastExtremeNegativeTick > 0 &&
                                              (Find.TickManager.TicksGame - comp.lastExtremeNegativeTick) < 300000;
 
-                if (hasBipolar || recentExtremeNegative)
+                if (hasEuphoriaTrait || recentExtremeNegative)
                 {
                     if (!comp.isEuphoric)
                     {
