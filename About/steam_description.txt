@@ -1,6 +1,6 @@
 [b]Discord Community:[/b] [url=https://discord.gg/eVBebZ2N9s]https://discord.gg/eVBebZ2N9s[/url]
 [b]Version:[/b] v0.10.0 (Target: RimWorld 1.6)
-[b]RELEASE CANDIDATE (v0.10.0-RC1)[/b] - 0.10.0 is feature-complete and in testing. Please report anything you find on GitHub or Discord before the final 0.10.0.
+[b]RELEASE CANDIDATE (v0.10.0-rc1)[/b] - 0.10.0 is feature-complete and in testing. Please report anything you find on GitHub or Discord before the final 0.10.0.
 
 [h1]RimSynapse - Psychology[/h1]
 [b][url=https://github.com/RimSynapse/Psychology/wiki]Official Wiki and Documentation[/url][/b]
@@ -21,7 +21,7 @@ These ship when they are ready - no dates.
 
 ---
 
-[h2]Changelog (v0.10.0-RC1) - Living Societies (Release Candidate)[/h2]
+[h2]Changelog (v0.10.0-rc1) - Living Societies (Release Candidate)[/h2]
 [list]
 [*] [b]RELEASE CANDIDATE:[/b] 0.10.0 is feature-complete and in testing. Please report anything you find on GitHub or Discord before the final 0.10.0.
 [*] [b]NEW - Relationship Compass:[/b] relationships are now two axes - Warmth (do they like each other?) and Trust (do they rely on each other?), each -100 to 100 - seeded by personality compatibility and moved by what colonists actually do together, not by chit-chat volume. Friendship AND rivalry milestones fire on both axes (so two colonists who only trade insults never become "best friends"), with reconciliation letters when old enemies make peace. Adds an emotional-brake "compulsion control", a nightly relationship evaluation, and an ideology-driven befriend -> convert -> recruit loop.
