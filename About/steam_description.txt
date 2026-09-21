@@ -57,5 +57,5 @@ These ship when they are ready - no dates.
 
 [h2]Source Code and Support[/h2]
 GitHub: [url]https://github.com/RimSynapse/Psychology[/url]
-Licence: [url=https://polyformproject.org/licenses/noncommercial/1.0.0/]PolyForm Noncommercial License 1.0.0[/url] - free for any noncommercial use.
-Buy me a coffee: [url]https://buymeacoffee.com/archdukejim[/url]
+Licence: [url=https://github.com/RimSynapse/Psychology/blob/main/LICENSE]PolyForm Noncommercial 1.0.0[/url] - free for any noncommercial use.
+Buy me a coffee: [url=https://ko-fi.com/archdukejim]ko-fi.com/archdukejim[/url]
