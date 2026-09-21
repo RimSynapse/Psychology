@@ -96,9 +96,18 @@ namespace RimSynapse.Psychology.API
             var comp = pawn.TryGetComp<SynapsePawnComp>();
             if (comp != null)
             {
-                comp.dynamicTraits.RemoveAll(x => x.traitDef == axis);
+                int nowTick = Find.TickManager.TicksGame;
+                // Close out any active record on this axis instead of deleting it (#25), so the loss and
+                // its reasoning survive on the timeline. A step to a new degree closes the old record and
+                // opens a fresh one — the history then reads "lost X … gained Y" in order.
+                foreach (var rec in comp.dynamicTraits)
+                    if (rec.traitDef == axis && rec.IsActive)
+                    {
+                        rec.tickRemoved = nowTick;
+                        rec.removalReason = aiReasoning;
+                    }
                 if (wantGain)
-                    comp.dynamicTraits.Add(new RimSynapse.Psychology.Models.DynamicTraitRecord(axis, Find.TickManager.TicksGame, aiReasoning));
+                    comp.dynamicTraits.Add(new RimSynapse.Psychology.Models.DynamicTraitRecord(axis, nowTick, aiReasoning));
             }
 
             string title = $"Personality Shift: {pawn.Name.ToStringShort}";

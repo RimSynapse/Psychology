@@ -72,6 +72,22 @@ namespace RimSynapse.Psychology.Comps
         public bool isAwaitingJournalUpdate = false;
         public float savedAverageMood = 0.5f;
 
+        /// <summary>Compulsion control / emotional brake in [0,1] (#72): 0 = volatile (acts on feelings),
+        /// 1 = controlled (feels but suppresses). -1 = "not set" — fall back to the deterministic trait baseline
+        /// (<see cref="RimSynapse.Psychology.API.SynapseCompulsion.Baseline"/>). The LLM eval writes this to
+        /// refine a pawn's temperament; the C# triggers only ever READ the effective value.</summary>
+        public float compulsionControl = -1f;
+
+        /// <summary>Day the nightly relationship review last ran for this pawn (#72), so it fires at most once a
+        /// day after their personality eval — not on every opportunistic tick.</summary>
+        public int lastRelationshipReviewDay = -1;
+
+        /// <summary>How open this pawn is to changing faith, 0..1 (#72). The LLM eval DETERMINES this gate (is
+        /// their certainty wavering, given their bonds + character); the C# driver then erodes their ideoligion
+        /// Certainty each day scaled by it × their warmth toward colonists of the colony's faith. 0 = unshakeable
+        /// (no drift no matter how many friends they make). Ideology-only; harmless otherwise.</summary>
+        public float conversionSusceptibility = 0f;
+
         // Stage 2: cooldown gate between AI-driven trait changes (#46). Absolute tick of the last change.
         public long lastTraitChangeTick = -1;
 
@@ -113,6 +129,9 @@ namespace RimSynapse.Psychology.Comps
             if (dynamicTraits == null) dynamicTraits = new List<RimSynapse.Psychology.Models.DynamicTraitRecord>();
             if (therapyTranscripts == null) therapyTranscripts = new List<RimSynapse.Psychology.Models.TherapyTranscript>();
             Scribe_Values.Look(ref savedAverageMood, "savedAverageMood", 0.5f);
+            Scribe_Values.Look(ref compulsionControl, "compulsionControl", -1f);
+            Scribe_Values.Look(ref lastRelationshipReviewDay, "lastRelationshipReviewDay", -1);
+            Scribe_Values.Look(ref conversionSusceptibility, "conversionSusceptibility", 0f);
             Scribe_Values.Look(ref lastTraitChangeTick, "lastTraitChangeTick", -1L);
             Scribe_Collections.Look(ref copingStates, "copingStates", LookMode.Deep);
             Scribe_Collections.Look(ref aversionRecurrence, "aversionRecurrence", LookMode.Value, LookMode.Value);
@@ -152,6 +171,11 @@ namespace RimSynapse.Psychology.Comps
 
             if (parent is Pawn pawn && pawn.Spawned && !pawn.Dead)
             {
+                // Unstick any async guard whose request was silently dropped (see SelfHealAsyncGuards):
+                // without this, one dropped request during map load would block backstory/voice
+                // generation for the rest of the session, leaving personalitySummary/voiceProfile empty.
+                SelfHealAsyncGuards(pawn);
+
                 // Async Backstory Stub — generate a full psychological profile for everyone the colony
                 // actually has a relationship with (colonists, prisoners, slaves, staying guests), not
                 // player-faction alone (#63). We reuse the SAME colony-relevance gate the nightly clinical
@@ -186,19 +210,35 @@ namespace RimSynapse.Psychology.Comps
                         // Re-run the SAME scoped profile pass (fits the small context window) — not a
                         // consolidated mega-call. Capped so a model that never returns valid JSON can't loop.
                         personalityBackfillTries++;
-                        isGeneratingBackstory = true;
+                        BeginBackstoryGen();
                         GeneratePersonalityProfile(pawn, coreForProfile);
                     }
                 }
 
-                // Voice backfill (#33): a pawn with a personality but no voice yet (e.g. a save predating
-                // voices) gets one derived once. New pawns get their voice with the profile itself.
-                if (hasBackstoryMemory && !isGeneratingVoice)
+                // Voice generation (#33, forward-looking for #41). Two populations, one cheap prompt each:
+                //   • Colony members: the full profile authors their voice, and this backfills it the moment
+                //     a personalitySummary exists but voiceProfile is still empty — we key on an EMPTY
+                //     voiceProfile, not the voiceGenerated flag (the profile step flips voiceGenerated=true
+                //     even when the model omits the Voice block, which used to strand them voiceless).
+                //   • Non-hostile visitors who may become conversation participants (#41): a voice derived
+                //     from vanilla data (traits + backstory), WITHOUT the clinical/personality pipeline —
+                //     so a passing trader can be voiced without paying the colony-member cost. Raiders and
+                //     other hostiles are excluded by IsEligibleForVoice.
+                // Bounded per session (MaxVoiceBackfillTries) so a model that never returns a usable style
+                // can't loop, and guarded by isGeneratingVoice (self-healed on drop) against double-firing.
+                if (!isGeneratingVoice && voiceBackfillTries < MaxVoiceBackfillTries)
                 {
                     var core = pawn.TryGetComp<RimSynapse.Comps.SynapseCorePawnComp>();
-                    if (core != null && !core.voiceGenerated && !string.IsNullOrEmpty(core.personalitySummary))
+                    if (core != null && string.IsNullOrWhiteSpace(core.voiceProfile))
                     {
-                        DeriveVoiceProfile(pawn, core);
+                        bool memberNeedsVoice = hasBackstoryMemory && VoiceProfileBuilder.NeedsVoiceBackfill(core);
+                        bool visitorNeedsVoice = !RimSynapse.Psychology.API.SynapsePsychology.IsEligibleForReview(pawn)
+                            && RimSynapse.Psychology.API.SynapsePsychology.IsEligibleForVoice(pawn);
+                        if (memberNeedsVoice || visitorNeedsVoice)
+                        {
+                            voiceBackfillTries++;
+                            DeriveVoiceProfile(pawn, core);
+                        }
                     }
                 }
 
@@ -251,6 +291,16 @@ namespace RimSynapse.Psychology.Comps
                 {
                     socialTickCounter = 0;
                     UpdateSocialNetwork(pawn);
+
+                    // #17: psychological conditions as treatable illnesses — seed them from the pawn's psyche,
+                    // let neglect (sustained misery) worsen them, and throw them into the linked mental state
+                    // more often the worse they are. Colony-affiliated pawns only.
+                    if (pawn.IsColonist || pawn.IsPrisonerOfColony || pawn.IsSlaveOfColony)
+                    {
+                        RimSynapse.Psychology.API.SynapseTherapyConditions.EnsureSeeded(pawn);
+                        RimSynapse.Psychology.API.SynapseTherapyConditions.TickProgression(pawn);
+                        RimSynapse.Psychology.API.SynapseTherapyConditions.TickChaos(pawn, 2500);
+                    }
                 }
             }
 
@@ -338,7 +388,15 @@ namespace RimSynapse.Psychology.Comps
                 therapyBlockReason = "Mental state too unstable for therapy.";
                 return;
             }
-            
+
+            // #17 redesign: therapy is done in the patient's OWN bedroom, so they need one.
+            if (pawn.ownership?.OwnedBed == null)
+            {
+                isTherapyReady = false;
+                therapyBlockReason = "Needs their own bedroom for therapy.";
+                return;
+            }
+
             // Check for locked traits
             if (pawn.story != null)
             {

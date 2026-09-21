@@ -49,6 +49,7 @@ namespace RimSynapse.Psychology.API
         public const string Greedy = "Greedy";
         public const string Jealous = "Jealous";
         public const string Ascetic = "Ascetic";
+        public const string Gourmand = "Gourmand";
 
         /// <summary>Maps a skill to its work type, the graduated DISTASTE spectrum a pawn moves along as they
         /// come to resent that work (reluctant -> averse, a skill penalty), and the rare terminal INCAPABLE
@@ -112,6 +113,30 @@ namespace RimSynapse.Psychology.API
 
         public static bool IsStrongPassion(Passion passion) => (int)passion >= (int)Passion.Major;
 
+        /// <summary>The exposure gate for the Bloodlust signal (#54): the share of the day spent in combat
+        /// against the living at/above which killing is "repeated" enough to matter. Below it, no push.</summary>
+        public const float BloodlustViolenceFloor = 0.10f;
+
+        /// <summary>
+        /// The Bloodlust reinforcement curve (#54), pure and directly unit-testable. Bloodlust develops from
+        /// PROFITABLE, DOMINANT killing — not survival killing. Returns the day's Bloodlust pressure [0..], which
+        /// is non-zero only when ALL hold: enough living violence (exposure ≥ <see cref="BloodlustViolenceFloor"/>),
+        /// a positive mood response (<paramref name="posR"/> &gt; 0), and kill <paramref name="dominance"/> &gt; 0
+        /// (they out-kill peers). Fortune blends the rising mood with rising wealth (<paramref name="wealthUp"/>),
+        /// wealth getting partial credit (0.5 floor) even when flat, so a warrior thriving in mood alone still
+        /// qualifies — more slowly. A pawn merely surviving a scramble (mood NOT rising, or not the dominant
+        /// killer) scores 0 here; that path becomes mood-down trauma at the call site instead.
+        /// </summary>
+        public static float BloodlustPressure(float livingViolenceFraction, float posR, float dominance, float wealthUp)
+        {
+            if (livingViolenceFraction < BloodlustViolenceFloor || posR <= 0f) return 0f;
+            float d = dominance < 0f ? 0f : (dominance > 1f ? 1f : dominance);
+            float w = wealthUp < 0f ? 0f : (wealthUp > 1f ? 1f : wealthUp);
+            float p = posR > 1f ? 1f : posR;
+            float fortune = p * (0.5f + 0.5f * w);
+            return 0.35f * d * fortune;
+        }
+
         /// <summary>
         /// Produce the day's measured signals for a pawn. Called once per day at the rest edge. Every signal
         /// is multidimensional: an <b>exposure</b> (the behaviour/condition) times a <b>reinforcement</b>
@@ -120,7 +145,8 @@ namespace RimSynapse.Psychology.API
         /// [-1,+1]; <paramref name="stress"/> is how close to a mental break they are, in [0,1]. Mutates
         /// Core's skill snapshot (for rust) but nothing else.
         /// </summary>
-        public static List<SkillSignal> SampleSignals(Pawn pawn, SynapseCorePawnComp core, float reinforcement, float stress)
+        public static List<SkillSignal> SampleSignals(Pawn pawn, SynapseCorePawnComp core, float reinforcement, float stress,
+            float wealthReinforcement = 0f, float individualWealth = -1f)
         {
             var signals = new List<SkillSignal>();
             if (pawn?.skills?.skills == null || core == null) return signals;
@@ -128,6 +154,7 @@ namespace RimSynapse.Psychology.API
             float posR = reinforcement > 0f ? reinforcement : 0f;   // felt better than usual today
             float negR = reinforcement < 0f ? -reinforcement : 0f;  // felt worse than usual today
             float S = stress < 0f ? 0f : (stress > 1f ? 1f : stress);
+            float wealthUp = wealthReinforcement > 0f ? wealthReinforcement : 0f; // personal fortune rising
 
             // ── P1/P2: fulfilled passion × lifted mood (Optimist); starved passion × strain (Pessimist) ──
             var strongPassions = new List<SkillRecord>();
@@ -170,11 +197,21 @@ namespace RimSynapse.Psychology.API
             else if (workDay && negR > 0f)
                 AddSpectrum(pawn, signals, Nerves, positive: false, 0.15f * negR, "grinding work with no reward");
 
-            // ── V1: violence vs the living — Bloodlust needs the mood spike; trauma otherwise ─────
+            // ── V1: violence vs the living — Bloodlust is REINFORCED, DOMINANT killing; trauma otherwise ─────
+            // Bloodlust develops only when a pawn keeps killing AND profits from it — mood AND personal fortune
+            // rising — ESPECIALLY when they out-kill the colony (#54). Killing while merely surviving a
+            // high-conflict scramble (not dominant, or fortune not improving) is trauma, so it pushes mood down
+            // instead. dominance (0..1) = how much they out-kill peers; fortune (0..1) = mood-up × wealth-up.
             if (livingViolenceFraction >= 0.10f)
             {
                 if (posR > 0f)
-                    AddSingle(pawn, signals, Bloodlust, add: true, 0.30f * posR, "killed the living and felt better for it");
+                {
+                    float dominance = SynapseCorePawnComp.KillDominance(pawn);
+                    float bloodlust = BloodlustPressure(livingViolenceFraction, posR, dominance, wealthUp);
+                    if (bloodlust > 0f)
+                        AddSingle(pawn, signals, Bloodlust, add: true, bloodlust,
+                            "out-killed the others and their fortunes rose for it");
+                }
                 else if (negR > 0f)
                     AddSpectrum(pawn, signals, NaturalMood, positive: false, 0.20f * negR, "shaken by the violence they did");
             }
@@ -190,7 +227,15 @@ namespace RimSynapse.Psychology.API
             AddFixationSignals(pawn, strongPassions, signals, S, negR);
 
             // ── Wealth: Greedy / Jealous / Ascetic, each gated by the mood response ───
-            AddWealthSignals(pawn, signals, posR, negR);
+            AddWealthSignals(pawn, signals, posR, negR, individualWealth);
+
+            // ── Food: Gourmand — a taste for good food, grown the same way as any trait: the behaviour (a
+            // fine/lavish meal savoured today) × the mood response. RimWorld collapses repeated fine meals into
+            // one refreshing thought, so "repeatedly" is captured ACROSS days: the signal fires each day the
+            // thought is present and decays when it lapses, so only sustained indulgence accumulates. Hunger
+            // food (paste/raw) is excluded by MealIndulgenceToday, so this is indulgence, not mere eating. ──
+            if (SynapseCorePawnComp.MealIndulgenceToday(pawn) >= 1 && posR > 0f)
+                AddSingle(pawn, signals, Gourmand, add: true, 0.20f * posR, "savoured fine food, and wanted more");
 
             return signals;
         }
@@ -265,12 +310,12 @@ namespace RimSynapse.Psychology.API
         /// Greedy = richer than peers AND pleased by it; Jealous = poorer than peers AND resentful of it;
         /// Ascetic = owns little yet content. Wealth is a per-pawn share of colony wealth (Core computes it).
         /// </summary>
-        private static void AddWealthSignals(Pawn pawn, List<SkillSignal> signals, float posR, float negR)
+        private static void AddWealthSignals(Pawn pawn, List<SkillSignal> signals, float posR, float negR, float mine = -1f)
         {
             if (pawn?.Map == null) return;
             float avg = SynapseCorePawnComp.ColonyAverageIndividualWealth(pawn.Map);
             if (avg <= 0f) return;
-            float mine = SynapseCorePawnComp.ComputeIndividualWealth(pawn);
+            if (mine < 0f) mine = SynapseCorePawnComp.ComputeIndividualWealth(pawn); // caller may pass it pre-computed
             float ratio = mine / avg;
 
             if (ratio >= 1.5f && posR > 0f)

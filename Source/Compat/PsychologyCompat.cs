@@ -23,8 +23,9 @@ namespace RimSynapse.Psychology
         /// </summary>
         public const int RequiredCoreContract = 1;
 
-        /// <summary>This mod's version, for the registry's informational report. Keep in step with About/Manifest.xml.</summary>
-        public const string PsychologyVersion = "0.9.1";
+        /// <summary>This mod's version, for the registry's informational report. Keep in step with About/Manifest.xml.
+        /// verify-metadata.ps1 guards this equality so it can't silently drift again (it did through 0.9.2/0.9.3).</summary>
+        public const string PsychologyVersion = "0.9.3";
 
         /// <summary>
         /// False when the installed Core is older than <see cref="RequiredCoreContract"/> — or absent

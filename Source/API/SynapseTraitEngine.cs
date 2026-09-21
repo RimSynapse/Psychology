@@ -41,7 +41,12 @@ namespace RimSynapse.Psychology.API
 
             float reinforcement = core.UpdateMoodBaselineAndGetReinforcement(todayMood);
             float stress = ComputeStress(pawn, todayMood);
-            var signals = SynapseSkillAxisMap.SampleSignals(pawn, core, reinforcement, stress);
+            // Fortune trend (#54): is this pawn's personal wealth rising? Compute the pawn's wealth ONCE here,
+            // fold it into its own EMA baseline (mirroring mood), and hand the same figure to SampleSignals so
+            // the wealth-trait signals reuse it rather than walking the pawn's gear a second time.
+            float mineWealth = SynapseCorePawnComp.ComputeIndividualWealth(pawn);
+            float wealthReinforcement = core.UpdateWealthBaselineAndGetReinforcement(mineWealth);
+            var signals = SynapseSkillAxisMap.SampleSignals(pawn, core, reinforcement, stress, wealthReinforcement, mineWealth);
             float mult = Settings?.traitDriftMultiplier ?? 1f; // master "how fast personalities drift" knob
             foreach (var sig in signals)
             {
@@ -52,6 +57,20 @@ namespace RimSynapse.Psychology.API
             }
 
             ResolveEscalation(pawn, core);
+
+            // #72: drift relationships toward what personalities currently imply — recomputed live so trait
+            // shifts move it, and modulated by familiarity/valence (desensitise a valued bond, hypersensitise a
+            // resented one). Runs on the same daily cadence as the trait pass.
+            var psychComp = pawn.TryGetComp<RimSynapse.Psychology.Comps.SynapsePawnComp>();
+            SynapseCompatibility.ApplyDailyDrift(pawn, psychComp);
+
+            // #72: faith drifts toward the people you love — erode certainty per the LLM susceptibility gate ×
+            // the compass (Ideology-only; no-op otherwise). When it bottoms out, vanilla converts them.
+            SynapseConversion.DriveDaily(pawn, psychComp);
+
+            // #72: a prisoner who's grown fond of the colonists softens toward joining (much faster once they
+            // share the colony's faith) — closing the befriend->convert->recruit loop. No-op for non-prisoners.
+            SynapseRecruitment.DriveDaily(pawn, psychComp);
         }
 
         private static int HardenAfterBreaks => Settings?.hardenAfterBreaks ?? 3; // repeated breaks before permanent
@@ -355,7 +374,11 @@ namespace RimSynapse.Psychology.API
             var comp = pawn.TryGetComp<SynapsePawnComp>();
             if (comp?.dynamicTraits == null || comp.dynamicTraits.Count == 0) return false;
             int now = Find.TickManager.TicksGame;
-            return comp.dynamicTraits.Any(d => now - d.tickAdded < ShiftCooldownTicks);
+            // A recent gain OR a recent removal both count as a shift for the cooldown — closed-out records
+            // now linger in the list (#25), so gate on whichever end of the trait's life is most recent.
+            return comp.dynamicTraits.Any(d =>
+                now - d.tickAdded < ShiftCooldownTicks
+                || (d.tickRemoved > 0 && now - d.tickRemoved < ShiftCooldownTicks));
         }
 
         /// <summary>Apply/refresh the growing-unease mood modifier at a stage scaled to how close to a shift the pawn is.</summary>
