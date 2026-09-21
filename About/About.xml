@@ -27,7 +27,6 @@
     <description>
 Discord Community: https://discord.gg/eVBebZ2N9s
 Version: v0.10.0 (Target: RimWorld 1.6)
-RELEASE CANDIDATE (v0.10.0-rc1) - 0.10.0 is feature-complete and in testing. Please report anything you find on GitHub or Discord before the final 0.10.0.
 
 RimSynapse - Psychology
 Official Wiki and Documentation: https://github.com/RimSynapse/Psychology/wiki
@@ -52,12 +51,11 @@ Brings your colonists to life by giving them evolving memories, complex interper
 - Psychological Addictions: Pawns may turn to specific drugs as a coping mechanism for specific negative memories.
 
 --- Roadmap ---
-0.10.0 - Living Societies: SHIPPING NOW as a release candidate (see changelog below).
+0.10.0 - Living Societies: SHIPPED (see changelog below).
 0.11.0 - Social Network Visualization: the Social Network tab becomes a colony-wide graph of trust and familiarity - one node per colonist, edges coloured by the relationship, and cliques drawn out as groups.
 These ship when they are ready - no dates.
 
---- Changelog (v0.10.0-rc1) - Living Societies (Release Candidate) ---
-- RELEASE CANDIDATE: 0.10.0 is feature-complete and in testing. Please report anything you find on GitHub or Discord before the final 0.10.0.
+--- Changelog (v0.10.0) - Living Societies ---
 - NEW - Relationship Compass: relationships are now two axes - Warmth (do they like each other?) and Trust (do they rely on each other?), each -100 to 100 - seeded by personality compatibility and moved by what colonists actually do together, not by chit-chat volume. Friendship AND rivalry milestones fire on both axes (so two colonists who only trade insults never become "best friends"), with reconciliation letters when old enemies make peace. Adds an emotional-brake "compulsion control", a nightly relationship evaluation, and an ideology-driven befriend -> convert -> recruit loop.
 - NEW - Therapy is treatment, not a coin flip: psychological struggles are now treatable conditions (Trauma/PTSD, Depression, Anxiety, Bipolar, Neurotic) cleared over repeated sessions with a weighted quality score - therapist Social skill, the patient's own bedroom, trust, and how reachable they are - held in the patient's bedroom rather than a hospital bed. Untreated conditions worsen and break more often. Pyromania is chronic (managed, never cured); Grief arises when someone close dies and eases with time or therapy. Three session modes: Guiding Hand, Watch, and Resolve in Background.
 - NEW - Colony Cliques: emergent friend-groups form from who your colonists are genuinely warm and familiar with, and feed into their dialogue and evaluations.
